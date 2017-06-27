@@ -30,18 +30,18 @@
   <ItemGroup>
     <FxCompile Include="Trivial_PS.hlsl" />
     <FxCompile Include="Trivial_VS.hlsl" />
+    <FxCompile Include="SamplePixelShader.hlsl">
+      <Filter>Source Files</Filter>
+    </FxCompile>
+    <FxCompile Include="SampleVertexShader.hlsl">
+      <Filter>Source Files</Filter>
+    </FxCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="Trivial_VS.csh">
       <Filter>Source Files</Filter>
     </None>
     <None Include="Trivial_PS.csh">
-      <Filter>Source Files</Filter>
-    </None>
-    <None Include="SamplePixelShader.csh">
-      <Filter>Source Files</Filter>
-    </None>
-    <None Include="SampleVertexShader.csh">
       <Filter>Source Files</Filter>
     </None>
   </ItemGroup>
