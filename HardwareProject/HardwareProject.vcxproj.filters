@@ -15,10 +15,10 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="main.cpp">
+    <ClCompile Include="XTime.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="XTime.cpp">
+    <ClCompile Include="main.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
@@ -32,7 +32,17 @@
     <FxCompile Include="Trivial_VS.hlsl" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="Trivial_VS.csh" />
-    <None Include="Trivial_PS.csh" />
+    <None Include="Trivial_VS.csh">
+      <Filter>Source Files</Filter>
+    </None>
+    <None Include="Trivial_PS.csh">
+      <Filter>Source Files</Filter>
+    </None>
+    <None Include="SamplePixelShader.csh">
+      <Filter>Source Files</Filter>
+    </None>
+    <None Include="SampleVertexShader.csh">
+      <Filter>Source Files</Filter>
+    </None>
   </ItemGroup>
 </Project>

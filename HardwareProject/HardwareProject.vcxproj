@@ -180,6 +180,8 @@
     </FxCompile>
   </ItemGroup>
   <ItemGroup>
+    <None Include="SamplePixelShader.csh" />
+    <None Include="SampleVertexShader.csh" />
     <None Include="Trivial_PS.csh" />
     <None Include="Trivial_VS.csh" />
   </ItemGroup>

@@ -29,6 +29,8 @@ using namespace DirectX;
 // TODO: PART 2 STEP 6
 #include "Trivial_PS.csh"
 #include "Trivial_VS.csh"
+#include "SamplePixelShader.csh"
+#include "SampleVertexShader.csh"
 
 #define BACKBUFFER_WIDTH	500
 #define BACKBUFFER_HEIGHT	500
