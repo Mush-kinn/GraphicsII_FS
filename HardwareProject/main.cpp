@@ -130,7 +130,7 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 	RECT window_size = { 0, 0, BACKBUFFER_WIDTH, BACKBUFFER_HEIGHT };
 	AdjustWindowRect(&window_size, WS_OVERLAPPEDWINDOW, false);
 
-	window = CreateWindow(	L"DirectXApplication", L"CGS Hardware Project",	WS_OVERLAPPEDWINDOW & ~(WS_THICKFRAME|WS_MAXIMIZEBOX), 
+	window = CreateWindow(	L"DirectXApplication", L"Project And Portfolio 4",	WS_OVERLAPPEDWINDOW & ~(WS_THICKFRAME|WS_MAXIMIZEBOX), 
 							CW_USEDEFAULT, CW_USEDEFAULT, window_size.right-window_size.left, window_size.bottom-window_size.top,					
 							NULL, NULL,	application, this );												
 
@@ -306,22 +306,35 @@ bool DEMO_APP::Run()
 	// TODO: PART 4 STEP 2	
 	timeX.Signal();
 
-	// TODO: PART 4 STEP 3
-	//NOTE: speed is declared in the class declaration at the top. Assingment is done in the end of the constructor.
+	MSG msg; ZeroMemory(&msg, sizeof(msg));
+	if (PeekMessage(&msg, window, WM_MOUSEMOVE, WM_MOUSEMOVE, PM_REMOVE)) {
+		int x, y;
+		x = (msg.lParam & 0xFFFF);
+		y = ((msg.lParam & 0xFFFF0000) >> 16);
+		toShader.constantOffset.x = (static_cast<float>(x) / (BACKBUFFER_WIDTH*0.5f)) - 1;
+		toShader.constantOffset.y = -((static_cast<float>(y) / (BACKBUFFER_HEIGHT*0.5f)) - 1);
 
-	speed.x = static_cast<float>(1.0f*timeX.Delta() * (speed.x < 0 ? -1 : 1));
-	speed.y = static_cast<float>(0.5f*timeX.Delta() * (speed.y < 0 ? -1 : 1));
-	toShader.constantOffset.x += speed.x;
-	toShader.constantOffset.y += speed.y;
-
-	// TODO: PART 4 STEP 5
-	if (toShader.constantOffset.x > 1 || toShader.constantOffset.x < -1){
-		speed.x *= -1;
-		toShader.constantOffset.x += speed.x;
 	}
-	if (toShader.constantOffset.y >1 || toShader.constantOffset.y < -1){
-		speed.y *= -1;
-		toShader.constantOffset.y += speed.y;
+	else {
+
+		// TODO: PART 4 STEP 3
+
+	//NOTE: speed is declared in the class declaration at the top.Assingment is done in the end of the constructor.
+		speed.x = static_cast<float>(1.0f*timeX.Delta() * (speed.x < 0 ? -1 : 1));
+		  speed.y = static_cast<float>(0.5f*timeX.Delta() * (speed.y < 0 ? -1 : 1));
+		  toShader.constantOffset.x += speed.x;
+		  toShader.constantOffset.y += speed.y;
+
+		  //// TODO: PART 4 STEP 5
+
+		  if (toShader.constantOffset.x > 1 || toShader.constantOffset.x < -1){
+			  speed.x *= -1;
+			  toShader.constantOffset.x += speed.x;
+		  }
+		  if (toShader.constantOffset.y >1 || toShader.constantOffset.y < -1){
+			  speed.y *= -1;
+			  toShader.constantOffset.y += speed.y;
+		  }
 	}
 
 	// END PART 4
@@ -449,7 +462,7 @@ int WINAPI wWinMain( HINSTANCE hInstance, HINSTANCE, LPTSTR, int )
     MSG msg; ZeroMemory( &msg, sizeof( msg ) );
     while ( msg.message != WM_QUIT && myApp.Run() )
     {	
-	    if ( PeekMessage( &msg, NULL, 0, 0, PM_REMOVE ) )
+	    if ( PeekMessage( &msg, NULL, 0, 0, PM_NOREMOVE ) )
         { 
             TranslateMessage( &msg );
             DispatchMessage( &msg ); 
