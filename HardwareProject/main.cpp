@@ -44,6 +44,18 @@ class DEMO_APP
 	HWND							window;
 
 	XMFLOAT2 speed;
+	
+	// Matrices
+	XMMATRIX view;
+	XMMATRIX Projection;
+	XMMATRIX CubeWorld;
+
+	// Buffers
+	ID3D11Buffer *vb_Cube;
+	ID3D11Buffer *vb_Grid;
+	
+	// Pending...
+
 
 	// TODO: PART 1 STEP 2
 	ID3D11Device *iDevice;
