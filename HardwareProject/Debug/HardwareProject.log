@@ -1,5 +1,29 @@
-﻿Build started 6/27/2017 19:02:44.
+﻿Build started 6/29/2017 1:46:41 PM.
+Project "Z:\Repositories\GraphicsII_FS\HardwareProject\HardwareProject.vcxproj" on node 2 (Build target(s)).
+FxCompile:
+  C:\Program Files (x86)\Windows Kits\8.1\bin\x86\fxc.exe /nologo /E"main" /T ps_4_0 /Fh "SamplePixelShader.csh" /Fo "Z:\Repositories\GraphicsII_FS\Debug\SamplePixelShader.cso" /Vn "SamplePixelShader" /Od /Zi SamplePixelShader.hlsl 
+  compilation header save succeeded; see Z:\Repositories\GraphicsII_FS\HardwareProject\SamplePixelShader.csh
+  compilation object save succeeded; see Z:\Repositories\GraphicsII_FS\Debug\SamplePixelShader.cso
+  C:\Program Files (x86)\Windows Kits\8.1\bin\x86\fxc.exe /nologo /E"main" /T vs_4_0 /Fh "SampleVertexShader.csh" /Fo "Z:\Repositories\GraphicsII_FS\Debug\SampleVertexShader.cso" /Vn "SampleVertexShader" /Od /Zi SampleVertexShader.hlsl 
+  compilation header save succeeded; see Z:\Repositories\GraphicsII_FS\HardwareProject\SampleVertexShader.csh
+  compilation object save succeeded; see Z:\Repositories\GraphicsII_FS\Debug\SampleVertexShader.cso
+  C:\Program Files (x86)\Windows Kits\8.1\bin\x86\fxc.exe /nologo /E"main" /T ps_4_0 /Fh "Trivial_PS.csh" /Fo "Z:\Repositories\GraphicsII_FS\Debug\Trivial_PS.cso" /Vn "Trivial_PS" /Od /Zi Trivial_PS.hlsl 
+  compilation header save succeeded; see Z:\Repositories\GraphicsII_FS\HardwareProject\Trivial_PS.csh
+  compilation object save succeeded; see Z:\Repositories\GraphicsII_FS\Debug\Trivial_PS.cso
+  C:\Program Files (x86)\Windows Kits\8.1\bin\x86\fxc.exe /nologo /E"main" /T vs_4_0 /Fh "Trivial_VS.csh" /Fo "Z:\Repositories\GraphicsII_FS\Debug\Trivial_VS.cso" /Vn "Trivial_VS" /Od /Zi Trivial_VS.hlsl 
+  compilation header save succeeded; see Z:\Repositories\GraphicsII_FS\HardwareProject\Trivial_VS.csh
+  compilation object save succeeded; see Z:\Repositories\GraphicsII_FS\Debug\Trivial_VS.cso
+ClCompile:
+  C:\Program Files (x86)\Microsoft Visual Studio 12.0\VC\bin\CL.exe /c /ZI /nologo /W3 /WX- /Od /Oy- /D WIN32 /D _DEBUG /D _WINDOWS /D _UNICODE /D UNICODE /Gm /EHsc /RTC1 /MDd /GS /fp:precise /Zc:wchar_t /Zc:forScope /Fo"Debug\\" /Fd"Debug\vc120.pdb" /Gd /TP /analyze- /errorReport:prompt main.cpp XTime.cpp
+  XTime.cpp
+  main.cpp
+  Generating Code...
+Link:
+  C:\Program Files (x86)\Microsoft Visual Studio 12.0\VC\bin\link.exe /ERRORREPORT:PROMPT /OUT:"Z:\Repositories\GraphicsII_FS\Debug\HardwareProject.exe" /INCREMENTAL /NOLOGO kernel32.lib user32.lib gdi32.lib winspool.lib comdlg32.lib advapi32.lib shell32.lib ole32.lib oleaut32.lib uuid.lib odbc32.lib odbccp32.lib /MANIFEST /MANIFESTUAC:"level='asInvoker' uiAccess='false'" /manifest:embed /DEBUG /PDB:"Z:\Repositories\GraphicsII_FS\Debug\HardwareProject.pdb" /SUBSYSTEM:WINDOWS /TLBID:1 /DYNAMICBASE /NXCOMPAT /IMPLIB:"Z:\Repositories\GraphicsII_FS\Debug\HardwareProject.lib" /MACHINE:X86 Debug\main.obj
+  Debug\XTime.obj
+  HardwareProject.vcxproj -> Z:\Repositories\GraphicsII_FS\Debug\HardwareProject.exe
+Done Building Project "Z:\Repositories\GraphicsII_FS\HardwareProject\HardwareProject.vcxproj" (Build target(s)).
 
 Build succeeded.
 
-Time Elapsed 00:00:00.01
+Time Elapsed 00:00:10.57
