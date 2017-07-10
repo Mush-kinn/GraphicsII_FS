@@ -307,13 +307,18 @@ bool DEMO_APP::Run()
 	timeX.Signal();
 
 	MSG msg; ZeroMemory(&msg, sizeof(msg));
-	if (PeekMessage(&msg, window, WM_MOUSEMOVE, WM_MOUSEMOVE, PM_REMOVE)) {
+	if (PeekMessage(&msg, NULL, WM_MOUSEMOVE, WM_MOUSEMOVE, PM_REMOVE)) {
 		int x, y;
+		// when msg.message is 0x0200 it's mouse input 
+		//   lParam has y mouse position on 0xFFFF0000
+		//   and x mouse position on 0x0000FFFF
 		x = (msg.lParam & 0xFFFF);
 		y = ((msg.lParam & 0xFFFF0000) >> 16);
 		toShader.constantOffset.x = (static_cast<float>(x) / (BACKBUFFER_WIDTH*0.5f)) - 1;
 		toShader.constantOffset.y = -((static_cast<float>(y) / (BACKBUFFER_HEIGHT*0.5f)) - 1);
 
+		TranslateMessage(&msg);
+		DispatchMessage(&msg);
 	}
 	else {
 
@@ -462,7 +467,7 @@ int WINAPI wWinMain( HINSTANCE hInstance, HINSTANCE, LPTSTR, int )
     MSG msg; ZeroMemory( &msg, sizeof( msg ) );
     while ( msg.message != WM_QUIT && myApp.Run() )
     {	
-	    if ( PeekMessage( &msg, NULL, 0, 0, PM_NOREMOVE ) )
+	    if ( PeekMessage( &msg, NULL, 0, 0, PM_REMOVE ) )
         { 
             TranslateMessage( &msg );
             DispatchMessage( &msg ); 
