@@ -30,6 +30,9 @@ using namespace DirectX;
 #include "Trivial_PS.csh"
 #include "Trivial_VS.csh"
 
+#include "SampleVertexShader.csh"
+#include "SamplePixelShader.csh"
+
 #define BACKBUFFER_WIDTH	500
 #define BACKBUFFER_HEIGHT	500
 
@@ -46,14 +49,21 @@ class DEMO_APP
 	XMFLOAT2 speed;
 	
 	// Matrices
-	XMMATRIX view;
-	XMMATRIX Projection;
-	XMMATRIX CubeWorld;
+	XMMATRIX m_view;
+	XMMATRIX m_Projection;
+	XMMATRIX m_CubeWorld;
 
 	// Buffers
 	ID3D11Buffer *vb_Cube;
 	ID3D11Buffer *vb_Grid;
+	ID3D11Buffer *cBuff_perspective;
 	
+	// Layouts
+	ID3D11InputLayout *lay_perspective;
+
+	// Shaders
+	ID3D11VertexShader *VertSha_perspective;
+	ID3D11PixelShader *PixSha_perspective;
 	// Pending...
 
 
@@ -89,15 +99,27 @@ class DEMO_APP
 		XMFLOAT2 padding;
 	};
 
+	struct cbMirror_3D{
+		XMMATRIX model;
+		XMMATRIX view;
+		XMMATRIX projection;
+	};
+
 	// TODO: PART 3 STEP 4a
 	SEND_TO_VRAM toShader;
 	SEND_TO_VRAM toShader_2;
+	cbMirror_3D toShader_perspective;
 
 public:
 	// BEGIN PART 2
 	// TODO: PART 2 STEP 1
 	struct SIMPLE_VERTEX{
 		XMFLOAT2 POSITION;
+	};
+
+	struct VERTEX_3D{
+		XMFLOAT3 POSITION;
+		XMFLOAT3 UV;
 	};
 	
 	DEMO_APP(HINSTANCE hinst, WNDPROC proc);
@@ -180,6 +202,86 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 	viewPort.MaxDepth = 1.0f;
 	viewPort.MinDepth = 0.0f;
 
+// <Mah 3D>
+	unsigned int indx = 0;
+	XMFLOAT3 aTri[4] = { XMFLOAT3(0, 1, 0), XMFLOAT3(1, 0, -0.5f), XMFLOAT3(-1, 0, -0.5f), XMFLOAT3(0, 0, 0.5) };
+	VERTEX_3D fourSidedTri[12];
+	bool flip = true;
+	for (unsigned int i = 0; i < 4; i++){
+		int e = i;
+		for (unsigned int laps = 0; laps < 3; laps++){
+			fourSidedTri[indx++].POSITION = aTri[e];
+			if (flip){
+				if (++e > 3)
+					e = 0;
+			}
+			else{
+				if (--e < 0)
+					e = 3;
+			}
+		}
+		flip = !flip;
+	}
+
+	D3D11_BUFFER_DESC desc_cube;
+	ZeroMemory(&desc_cube, sizeof(D3D11_BUFFER_DESC));
+	desc_cube.Usage = D3D11_USAGE::D3D11_USAGE_IMMUTABLE;
+	desc_cube.ByteWidth = sizeof(VERTEX_3D) * 12;
+	desc_cube.BindFlags = D3D11_BIND_FLAG::D3D11_BIND_VERTEX_BUFFER;
+
+	D3D11_SUBRESOURCE_DATA res_cube;
+	ZeroMemory(&res_cube, sizeof(D3D11_SUBRESOURCE_DATA));
+	res_cube.pSysMem = fourSidedTri;
+
+	iDevice->CreateBuffer(&desc_cube, &res_cube, &vb_Cube);
+
+	m_CubeWorld = XMMatrixIdentity();
+	XMMATRIX rotation_trix;
+
+	m_view = XMMATRIX(
+		0.0f, 0.0f, 0.0f, 0.0f,
+		0.0f, 0.0f, 0.0f, 0.0f,
+		0.0f, 0.0f, 0.0f, 0.0f,
+		0.0f, 0.0f, -1.0f, 1.0f);
+
+	rotation_trix = XMMatrixRotationX(-18);
+	m_view = XMMatrixMultiply(m_view,rotation_trix);
+	XMVECTOR determinant = XMMatrixDeterminant(m_view);
+	m_view = XMMatrixInverse(&determinant, m_view);
+	m_view = XMMatrixTranspose(m_view);
+
+	// zNear = 0.1;
+	// zFar = 10
+	// vFOV = 90
+	float aspect = BACKBUFFER_HEIGHT / BACKBUFFER_WIDTH;
+	m_Projection = XMMatrixPerspectiveFovLH(XMConvertToRadians(90.0f), aspect, 0.1f, 10.0f);
+	m_Projection = XMMatrixTranspose(m_Projection);
+
+	m_CubeWorld = XMMatrixTranspose(m_CubeWorld);
+
+	toShader_perspective.model = m_CubeWorld;
+	toShader_perspective.projection = m_Projection;
+	toShader_perspective.view = m_view;	
+
+	iDevice->CreateVertexShader(&SampleVertexShader, sizeof(SampleVertexShader), NULL, &VertSha_perspective);
+	iDevice->CreatePixelShader(&SamplePixelShader, sizeof(SamplePixelShader), NULL, &PixSha_perspective);
+
+	D3D11_INPUT_ELEMENT_DESC layout3d[2];
+	layout3d[0] = { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0 };
+	layout3d[1] = { "UV", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0 };
+
+	iDevice->CreateInputLayout(layout3d, 2, &SampleVertexShader, sizeof(SampleVertexShader), &lay_perspective);
+
+	D3D11_BUFFER_DESC cb_3d;
+	ZeroMemory(&cb_3d, sizeof(D3D11_BUFFER_DESC));
+	cb_3d.Usage = D3D11_USAGE_DYNAMIC;
+	cb_3d.ByteWidth = sizeof(cbMirror_3D);
+	cb_3d.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
+	cb_3d.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+	iDevice->CreateBuffer(&cb_3d, NULL, &cBuff_perspective);
+
+// <mah 3D />
+
 	// TODO: PART 2 STEP 3a 
 	SIMPLE_VERTEX mahCircle[360];
 	for (unsigned int i = 0; i < vCount_Crcl; ++i){
@@ -220,7 +322,7 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 	Zig[4] = XMFLOAT2(0.1f, -0.1f);
 	Zig[5] = XMFLOAT2(0.0f, -0.1f);
 
-	unsigned int indx = 0;
+	indx = 0;
 	XMFLOAT2 OFF = XMFLOAT2(-0.9f,1.0f);
 	for (; OFF.y > -0.99999f; OFF.y -= 0.1f){
 		for (; OFF.x < 0.99999f; OFF.x += 0.2f){
@@ -243,7 +345,6 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 		}
 		OFF.x -= 1.9f;
 	}
-
 	// TODO: PART 5 STEP 3
 	D3D11_BUFFER_DESC checkDesc;
 	ZeroMemory(&checkDesc, sizeof(D3D11_BUFFER_DESC));
@@ -306,24 +407,8 @@ bool DEMO_APP::Run()
 	// TODO: PART 4 STEP 2	
 	timeX.Signal();
 
-	MSG msg; ZeroMemory(&msg, sizeof(msg));
-	if (PeekMessage(&msg, NULL, WM_MOUSEMOVE, WM_MOUSEMOVE, PM_REMOVE)) {
-		int x, y;
-		// when msg.message is 0x0200 it's mouse input 
-		//   lParam has y mouse position on 0xFFFF0000
-		//   and x mouse position on 0x0000FFFF
-		x = (msg.lParam & 0xFFFF);
-		y = ((msg.lParam & 0xFFFF0000) >> 16);
-		toShader.constantOffset.x = (static_cast<float>(x) / (BACKBUFFER_WIDTH*0.5f)) - 1;
-		toShader.constantOffset.y = -((static_cast<float>(y) / (BACKBUFFER_HEIGHT*0.5f)) - 1);
 
-		TranslateMessage(&msg);
-		DispatchMessage(&msg);
-	}
-	else {
-
-		// TODO: PART 4 STEP 3
-
+	// TODO: PART 4 STEP 3
 	//NOTE: speed is declared in the class declaration at the top.Assingment is done in the end of the constructor.
 		speed.x = static_cast<float>(1.0f*timeX.Delta() * (speed.x < 0 ? -1 : 1));
 		  speed.y = static_cast<float>(0.5f*timeX.Delta() * (speed.y < 0 ? -1 : 1));
@@ -340,7 +425,7 @@ bool DEMO_APP::Run()
 			  speed.y *= -1;
 			  toShader.constantOffset.y += speed.y;
 		  }
-	}
+	
 
 	// END PART 4
 

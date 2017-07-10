@@ -44,5 +44,11 @@
     <None Include="Trivial_PS.csh">
       <Filter>Source Files</Filter>
     </None>
+    <None Include="SamplePixelShader.csh">
+      <Filter>Source Files</Filter>
+    </None>
+    <None Include="SampleVertexShader.csh">
+      <Filter>Source Files</Filter>
+    </None>
   </ItemGroup>
 </Project>
