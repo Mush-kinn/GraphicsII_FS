@@ -47,6 +47,7 @@ class DEMO_APP
 	HWND							window;
 
 	XMFLOAT2 speed;
+	float turn;
 	
 	// Matrices
 	XMMATRIX m_view;
@@ -210,7 +211,8 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 	for (unsigned int i = 0; i < 4; i++){
 		int e = i;
 		for (unsigned int laps = 0; laps < 3; laps++){
-			fourSidedTri[indx++].POSITION = aTri[e];
+			fourSidedTri[indx].POSITION = aTri[e];
+			fourSidedTri[indx++].UV = XMFLOAT3(0.8f, 0.5f, 1.0f);
 			if (flip){
 				if (++e > 3)
 					e = 0;
@@ -239,13 +241,13 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 	XMMATRIX rotation_trix;
 
 	m_view = XMMATRIX(
-		0.0f, 0.0f, 0.0f, 0.0f,
-		0.0f, 0.0f, 0.0f, 0.0f,
-		0.0f, 0.0f, 0.0f, 0.0f,
+		1.0f, 0.0f, 0.0f, 0.0f,
+		0.0f, 1.0f, 0.0f, 0.0f,
+		0.0f, 0.0f, 1.0f, 0.0f,
 		0.0f, 0.0f, -1.0f, 1.0f);
 
-	rotation_trix = XMMatrixRotationX(-18);
-	m_view = XMMatrixMultiply(m_view,rotation_trix);
+	rotation_trix = XMMatrixRotationX(XMConvertToRadians(18));
+	m_view = XMMatrixMultiply(m_view, rotation_trix);
 	XMVECTOR determinant = XMMatrixDeterminant(m_view);
 	m_view = XMMatrixInverse(&determinant, m_view);
 	m_view = XMMatrixTranspose(m_view);
@@ -257,9 +259,6 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 	m_Projection = XMMatrixPerspectiveFovLH(XMConvertToRadians(90.0f), aspect, 0.1f, 10.0f);
 	m_Projection = XMMatrixTranspose(m_Projection);
 
-	m_CubeWorld = XMMatrixTranspose(m_CubeWorld);
-
-	toShader_perspective.model = m_CubeWorld;
 	toShader_perspective.projection = m_Projection;
 	toShader_perspective.view = m_view;	
 
@@ -406,6 +405,7 @@ bool DEMO_APP::Run()
 {
 	// TODO: PART 4 STEP 2	
 	timeX.Signal();
+	turn += 0.5f*timeX.Delta();
 
 
 	// TODO: PART 4 STEP 3
@@ -439,9 +439,39 @@ bool DEMO_APP::Run()
 	FLOAT DarkBlue[] = { 0.0f, 0.0f, 0.45f, 1.0f };
 	iDeviceContext->ClearRenderTargetView(iRenderTarget, DarkBlue);
 
+// <Mah 3d>
+	m_CubeWorld = XMMatrixMultiplyTranspose(XMMatrixRotationY(XMConvertToRadians(turn)),m_CubeWorld);
+	toShader_perspective.model = m_CubeWorld;
+
+
+	ZeroMemory(&toShader_perspective, sizeof(VERTEX_3D));
+	D3D11_MAPPED_SUBRESOURCE map_cube;
+	ZeroMemory(&map_cube, sizeof(D3D11_MAPPED_SUBRESOURCE));
+	iDeviceContext->Map(cBuff_perspective, 0, D3D11_MAP::D3D11_MAP_WRITE_DISCARD, NULL, &map_cube);
+	memcpy(map_cube.pData, &toShader_perspective, sizeof(toShader_perspective));
+	iDeviceContext->Unmap(cBuff_perspective, 0);
+	iDeviceContext->VSSetConstantBuffers(0, 1, &cBuff_perspective);
+
+	UINT _startSlot = 0;
+	UINT _numBuffs = 1;
+	UINT _strides[D3D11_IA_VERTEX_INPUT_RESOURCE_SLOT_COUNT];
+	UINT _offSets[D3D11_IA_VERTEX_INPUT_RESOURCE_SLOT_COUNT];
+	ZeroMemory(_strides, sizeof(_strides));
+	ZeroMemory(_offSets, sizeof(_offSets));
+	_strides[0] = static_cast<UINT>(sizeof(VERTEX_3D));
+	iDeviceContext->IASetVertexBuffers(0, 1, &vb_Cube, _strides, _offSets);
+
+	iDeviceContext->VSSetShader(VertSha_perspective, NULL, NULL);
+	iDeviceContext->PSSetShader(PixSha_perspective, NULL, NULL);
+
+	iDeviceContext->IASetInputLayout(lay_perspective);
+	iDeviceContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY::D3D11_PRIMITIVE_TOPOLOGY_LINELIST_ADJ);
+	iDeviceContext->Draw(12, 0);
+
+// <Mah 3d/>
+#if 0
 	// TODO: PART 5 STEP 4
 	ZeroMemory(&toShader_2, sizeof(SEND_TO_VRAM));
-
 	// TODO: PART 5 STEP 5
 	D3D11_MAPPED_SUBRESOURCE mapResource;
 	ZeroMemory(&mapResource, sizeof(mapResource));
@@ -449,11 +479,13 @@ bool DEMO_APP::Run()
 	memcpy(mapResource.pData, &toShader_2, sizeof(toShader_2));
 	iDeviceContext->Unmap(constBuffer, 0);
 
+	iDeviceContext->VSSetConstantBuffers(0, 1, &constBuffer);
+
 	// TODO: PART 5 STEP 6
-	UINT _startSlot = 0;
-	UINT _numBuffs = 1;
-	UINT _strides[D3D11_IA_VERTEX_INPUT_RESOURCE_SLOT_COUNT];
-	UINT _offSets[D3D11_IA_VERTEX_INPUT_RESOURCE_SLOT_COUNT];
+	_startSlot = 0;
+	_numBuffs = 1;
+	_strides[D3D11_IA_VERTEX_INPUT_RESOURCE_SLOT_COUNT];
+	_offSets[D3D11_IA_VERTEX_INPUT_RESOURCE_SLOT_COUNT];
 	ZeroMemory(_strides, sizeof(_strides));
 	ZeroMemory(_offSets, sizeof(_offSets));
 	_strides[0] = static_cast<UINT>(sizeof(SIMPLE_VERTEX));
@@ -469,7 +501,7 @@ bool DEMO_APP::Run()
 	// TODO: PART 5 STEP 7
 	
 	// END PART 5
-	
+
 	// TODO: PART 3 STEP 5
 	ZeroMemory(&mapResource, sizeof(mapResource));
 	iDeviceContext->Map(constBuffer, 0, D3D11_MAP::D3D11_MAP_WRITE_DISCARD, NULL, &mapResource );
@@ -501,6 +533,7 @@ bool DEMO_APP::Run()
 
 	// TODO: PART 2 STEP 10
 	iDeviceContext->Draw(vCount_Crcl, 0);
+#endif
 
 	// END PART 2
 
