@@ -52,7 +52,7 @@ class DEMO_APP
 	// Matrices
 	XMFLOAT4X4 m_view;
 	XMMATRIX m_Projection;
-	XMMATRIX m_CubeWorld;
+	XMFLOAT4X4 m_CubeWorld;
 
 	// Buffers
 	ID3D11Buffer *vb_Cube;
@@ -205,25 +205,28 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 
 // <Mah 3D>
 	unsigned int indx = 0;
-	XMFLOAT3 aTri[4] = { XMFLOAT3(0, 1, 0), XMFLOAT3(1, 0, -0.5f), XMFLOAT3(-1, 0, -0.5f), XMFLOAT3(0, 0, 0.5) };
-	VERTEX_3D testTri[3];
-	testTri[0].pos = XMFLOAT3(0,1,0);
-	testTri[0].col = XMFLOAT4(1,1,1,1);
-
-	testTri[1].pos = XMFLOAT3(1,0,0);
-	testTri[1].col = XMFLOAT4(1,1,1,1);
-
-	testTri[2].pos = XMFLOAT3(-1,0,0);
-	testTri[2].col = XMFLOAT4(1,1,1,1);
-
+	XMFLOAT3 aTri[4] = { XMFLOAT3(0, 0.8f, 0), XMFLOAT3(0.5f, 0, -0.4f), XMFLOAT3(-0.5f, 0, -0.4f), XMFLOAT3(0, 0, 0.6f) };
 #if 0
+	VERTEX_3D testTri[3];
+	testTri[0].pos = XMFLOAT3(0, 0.8f, 0);
+	testTri[0].col = XMFLOAT4(1, 1, 1, 1);
+
+	testTri[1].pos = XMFLOAT3(1, 0, 0);
+	testTri[1].col = XMFLOAT4(1, 1, 1, 1);
+
+	testTri[2].pos = XMFLOAT3(-1, 0, 0);
+	testTri[2].col = XMFLOAT4(1, 1, 1, 1);
+#endif 
+
+
+#if 1
 	VERTEX_3D fourSidedTri[12];
 	bool flip = true;
 	for (unsigned int i = 0; i < 4; i++){
 		int e = i;
 		for (unsigned int laps = 0; laps < 3; laps++){
-			fourSidedTri[indx].POSITION = aTri[e];
-			fourSidedTri[indx++].UV = XMFLOAT3(0.8f, 0.5f, 1.0f);
+			fourSidedTri[indx].pos = aTri[e];
+			fourSidedTri[indx++].col = XMFLOAT4(0.8f, 0.5f, 0.0f,1.0f);
 			if (flip){
 				if (++e > 3)
 					e = 0;
@@ -240,27 +243,27 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 	D3D11_BUFFER_DESC desc_cube;
 	ZeroMemory(&desc_cube, sizeof(D3D11_BUFFER_DESC));
 	desc_cube.Usage = D3D11_USAGE::D3D11_USAGE_IMMUTABLE;
-	desc_cube.ByteWidth = sizeof(VERTEX_3D) * 3;
+	desc_cube.ByteWidth = sizeof(VERTEX_3D) * 12;
 	desc_cube.BindFlags = D3D11_BIND_FLAG::D3D11_BIND_VERTEX_BUFFER;
 
 	D3D11_SUBRESOURCE_DATA res_cube;
 	ZeroMemory(&res_cube, sizeof(D3D11_SUBRESOURCE_DATA));
-	res_cube.pSysMem = testTri;
+	res_cube.pSysMem = fourSidedTri;
 
 	iDevice->CreateBuffer(&desc_cube, &res_cube, &vb_Cube);
 
-	m_CubeWorld = XMMatrixIdentity();
+	XMStoreFloat4x4(&m_CubeWorld,XMMatrixIdentity());
 
 	m_view = XMFLOAT4X4(
 		1.0f, 0.0f, 0.0f, 0.0f,
 		0.0f, 1.0f, 0.0f, 0.0f,
 		0.0f, 0.0f, 1.0f, 0.0f,
-		0.0f, 0.0f, -0.5f, 1.0f);
+		0.0f, 0.0f, -1.5f, 1.0f);
 
-	//XMMATRIX rotation_trix;
+	XMMATRIX rotation_trix;
 	XMMATRIX view = XMLoadFloat4x4(&m_view);
-	//rotation_trix = XMMatrixRotationX(XMConvertToRadians(18));
-	//view = XMMatrixMultiply(view, rotation_trix);
+	rotation_trix = XMMatrixRotationX(XMConvertToRadians(18));
+	view = XMMatrixMultiply(view, rotation_trix);
 	XMVECTOR determinant = XMMatrixDeterminant(view);
 	view = XMMatrixInverse(nullptr, view);
 	view = XMMatrixTranspose(view);
@@ -269,12 +272,17 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 	// zNear = 0.1;
 	// zFar = 10
 	// vFOV = 90
-	float aspect = BACKBUFFER_HEIGHT / BACKBUFFER_WIDTH;
-	m_Projection = XMMatrixPerspectiveFovLH(XMConvertToRadians(90.0f), aspect, 0.1f, 100.0f);
-	m_Projection = XMMatrixTranspose(m_Projection);
+	float aspect = BACKBUFFER_WIDTH / BACKBUFFER_HEIGHT;
+	m_Projection = XMMatrixPerspectiveFovLH(XMConvertToRadians(90.0f), aspect, 0.1f, 1000.0f);
 
-	toShader_perspective.projection = m_Projection;
+	toShader_perspective.projection = XMMatrixTranspose(m_Projection);
 	toShader_perspective.view = XMLoadFloat4x4(&m_view);	
+
+	XMMATRIX model = XMLoadFloat4x4(&m_CubeWorld);
+	model = XMMatrixTranslation(0, 0, 0);
+	toShader_perspective.model = XMMatrixTranspose(model);
+	XMStoreFloat4x4(&m_CubeWorld, model);
+
 
 	iDevice->CreateVertexShader(&SampleVertexShader, sizeof(SampleVertexShader), NULL, &VertSha_perspective);
 	iDevice->CreatePixelShader(&SamplePixelShader, sizeof(SamplePixelShader), NULL, &PixSha_perspective);
@@ -294,6 +302,7 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 	iDevice->CreateBuffer(&cb_3d, NULL, &cBuff_perspective);
 
 // <mah 3D />
+
 
 	// TODO: PART 2 STEP 3a 
 	SIMPLE_VERTEX mahCircle[360];
@@ -408,6 +417,7 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 
 	speed.x = 1;
 	speed.y = 1;
+	turn = 0.02f;
 
 }
 
@@ -419,7 +429,6 @@ bool DEMO_APP::Run()
 {
 	// TODO: PART 4 STEP 2	
 	timeX.Signal();
-	turn += static_cast<float>(0.5f*timeX.Delta());
 
 
 	// TODO: PART 4 STEP 3
@@ -454,11 +463,12 @@ bool DEMO_APP::Run()
 	iDeviceContext->ClearRenderTargetView(iRenderTarget, DarkBlue);
 
 // <Mah 3d>
-	//m_CubeWorld = XMMatrixMultiplyTranspose(XMMatrixRotationY(XMConvertToRadians(turn)),m_CubeWorld);
-	toShader_perspective.model = XMMatrixIdentity();
+	XMMATRIX cubeWorld= XMLoadFloat4x4(&m_CubeWorld);
+	cubeWorld = XMMatrixRotationY(XMConvertToRadians(turn))*cubeWorld;
+	toShader_perspective.model = XMMatrixTranspose(cubeWorld);
+	XMStoreFloat4x4(&m_CubeWorld, cubeWorld);
 
-
-	ZeroMemory(&toShader_perspective, sizeof(cbMirror_3D));
+	//ZeroMemory(&toShader_perspective, sizeof(cbMirror_3D));
 	D3D11_MAPPED_SUBRESOURCE map_cube;
 	ZeroMemory(&map_cube, sizeof(D3D11_MAPPED_SUBRESOURCE));
 	iDeviceContext->Map(cBuff_perspective, 0, D3D11_MAP::D3D11_MAP_WRITE_DISCARD, NULL, &map_cube);
@@ -478,9 +488,9 @@ bool DEMO_APP::Run()
 	iDeviceContext->VSSetShader(VertSha_perspective, NULL, NULL);
 	iDeviceContext->PSSetShader(PixSha_perspective, NULL, NULL);
 
-	iDeviceContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY::D3D10_PRIMITIVE_TOPOLOGY_LINELIST_ADJ);
+	iDeviceContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY::D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 	iDeviceContext->IASetInputLayout(lay_perspective);
-	iDeviceContext->Draw(3, 0);
+	iDeviceContext->Draw(12, 0);
 
 // <Mah 3d/>
 
@@ -569,7 +579,6 @@ bool DEMO_APP::ShutDown()
 	iDevice->Release();
 	swapChain->Release();
 	iDeviceContext->Release();
-
 
 	iLayout->Release();
 	iVertShader->Release();
