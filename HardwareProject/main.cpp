@@ -50,7 +50,7 @@ class DEMO_APP
 	float turn;
 	
 	// Matrices
-	XMMATRIX m_view;
+	XMFLOAT4X4 m_view;
 	XMMATRIX m_Projection;
 	XMMATRIX m_CubeWorld;
 
@@ -119,8 +119,8 @@ public:
 	};
 
 	struct VERTEX_3D{
-		XMFLOAT3 POSITION;
-		XMFLOAT3 UV;
+		XMFLOAT3 pos;
+		XMFLOAT4 col;
 	};
 	
 	DEMO_APP(HINSTANCE hinst, WNDPROC proc);
@@ -206,6 +206,17 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 // <Mah 3D>
 	unsigned int indx = 0;
 	XMFLOAT3 aTri[4] = { XMFLOAT3(0, 1, 0), XMFLOAT3(1, 0, -0.5f), XMFLOAT3(-1, 0, -0.5f), XMFLOAT3(0, 0, 0.5) };
+	VERTEX_3D testTri[3];
+	testTri[0].pos = XMFLOAT3(0,1,0);
+	testTri[0].col = XMFLOAT4(1,1,1,1);
+
+	testTri[1].pos = XMFLOAT3(1,0,0);
+	testTri[1].col = XMFLOAT4(1,1,1,1);
+
+	testTri[2].pos = XMFLOAT3(-1,0,0);
+	testTri[2].col = XMFLOAT4(1,1,1,1);
+
+#if 0
 	VERTEX_3D fourSidedTri[12];
 	bool flip = true;
 	for (unsigned int i = 0; i < 4; i++){
@@ -224,50 +235,53 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 		}
 		flip = !flip;
 	}
+#endif
 
 	D3D11_BUFFER_DESC desc_cube;
 	ZeroMemory(&desc_cube, sizeof(D3D11_BUFFER_DESC));
 	desc_cube.Usage = D3D11_USAGE::D3D11_USAGE_IMMUTABLE;
-	desc_cube.ByteWidth = sizeof(VERTEX_3D) * 12;
+	desc_cube.ByteWidth = sizeof(VERTEX_3D) * 3;
 	desc_cube.BindFlags = D3D11_BIND_FLAG::D3D11_BIND_VERTEX_BUFFER;
 
 	D3D11_SUBRESOURCE_DATA res_cube;
 	ZeroMemory(&res_cube, sizeof(D3D11_SUBRESOURCE_DATA));
-	res_cube.pSysMem = fourSidedTri;
+	res_cube.pSysMem = testTri;
 
 	iDevice->CreateBuffer(&desc_cube, &res_cube, &vb_Cube);
 
 	m_CubeWorld = XMMatrixIdentity();
-	XMMATRIX rotation_trix;
 
-	m_view = XMMATRIX(
+	m_view = XMFLOAT4X4(
 		1.0f, 0.0f, 0.0f, 0.0f,
 		0.0f, 1.0f, 0.0f, 0.0f,
 		0.0f, 0.0f, 1.0f, 0.0f,
-		0.0f, 0.0f, -1.0f, 1.0f);
+		0.0f, 0.0f, -0.5f, 1.0f);
 
-	rotation_trix = XMMatrixRotationX(XMConvertToRadians(18));
-	m_view = XMMatrixMultiply(m_view, rotation_trix);
-	XMVECTOR determinant = XMMatrixDeterminant(m_view);
-	m_view = XMMatrixInverse(&determinant, m_view);
-	m_view = XMMatrixTranspose(m_view);
+	//XMMATRIX rotation_trix;
+	XMMATRIX view = XMLoadFloat4x4(&m_view);
+	//rotation_trix = XMMatrixRotationX(XMConvertToRadians(18));
+	//view = XMMatrixMultiply(view, rotation_trix);
+	XMVECTOR determinant = XMMatrixDeterminant(view);
+	view = XMMatrixInverse(nullptr, view);
+	view = XMMatrixTranspose(view);
+	XMStoreFloat4x4(&m_view, view);
 
 	// zNear = 0.1;
 	// zFar = 10
 	// vFOV = 90
 	float aspect = BACKBUFFER_HEIGHT / BACKBUFFER_WIDTH;
-	m_Projection = XMMatrixPerspectiveFovLH(XMConvertToRadians(90.0f), aspect, 0.1f, 10.0f);
+	m_Projection = XMMatrixPerspectiveFovLH(XMConvertToRadians(90.0f), aspect, 0.1f, 100.0f);
 	m_Projection = XMMatrixTranspose(m_Projection);
 
 	toShader_perspective.projection = m_Projection;
-	toShader_perspective.view = m_view;	
+	toShader_perspective.view = XMLoadFloat4x4(&m_view);	
 
 	iDevice->CreateVertexShader(&SampleVertexShader, sizeof(SampleVertexShader), NULL, &VertSha_perspective);
 	iDevice->CreatePixelShader(&SamplePixelShader, sizeof(SamplePixelShader), NULL, &PixSha_perspective);
 
 	D3D11_INPUT_ELEMENT_DESC layout3d[2];
-	layout3d[0] = { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0 };
-	layout3d[1] = { "UV", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0 };
+	layout3d[0] = { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 };
+	layout3d[1] = { "COLOR", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 };
 
 	iDevice->CreateInputLayout(layout3d, 2, &SampleVertexShader, sizeof(SampleVertexShader), &lay_perspective);
 
@@ -405,7 +419,7 @@ bool DEMO_APP::Run()
 {
 	// TODO: PART 4 STEP 2	
 	timeX.Signal();
-	turn += 0.5f*timeX.Delta();
+	turn += static_cast<float>(0.5f*timeX.Delta());
 
 
 	// TODO: PART 4 STEP 3
@@ -440,11 +454,11 @@ bool DEMO_APP::Run()
 	iDeviceContext->ClearRenderTargetView(iRenderTarget, DarkBlue);
 
 // <Mah 3d>
-	m_CubeWorld = XMMatrixMultiplyTranspose(XMMatrixRotationY(XMConvertToRadians(turn)),m_CubeWorld);
-	toShader_perspective.model = m_CubeWorld;
+	//m_CubeWorld = XMMatrixMultiplyTranspose(XMMatrixRotationY(XMConvertToRadians(turn)),m_CubeWorld);
+	toShader_perspective.model = XMMatrixIdentity();
 
 
-	ZeroMemory(&toShader_perspective, sizeof(VERTEX_3D));
+	ZeroMemory(&toShader_perspective, sizeof(cbMirror_3D));
 	D3D11_MAPPED_SUBRESOURCE map_cube;
 	ZeroMemory(&map_cube, sizeof(D3D11_MAPPED_SUBRESOURCE));
 	iDeviceContext->Map(cBuff_perspective, 0, D3D11_MAP::D3D11_MAP_WRITE_DISCARD, NULL, &map_cube);
@@ -464,11 +478,12 @@ bool DEMO_APP::Run()
 	iDeviceContext->VSSetShader(VertSha_perspective, NULL, NULL);
 	iDeviceContext->PSSetShader(PixSha_perspective, NULL, NULL);
 
+	iDeviceContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY::D3D10_PRIMITIVE_TOPOLOGY_LINELIST_ADJ);
 	iDeviceContext->IASetInputLayout(lay_perspective);
-	iDeviceContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY::D3D11_PRIMITIVE_TOPOLOGY_LINELIST_ADJ);
-	iDeviceContext->Draw(12, 0);
+	iDeviceContext->Draw(3, 0);
 
 // <Mah 3d/>
+
 #if 0
 	// TODO: PART 5 STEP 4
 	ZeroMemory(&toShader_2, sizeof(SEND_TO_VRAM));
@@ -478,7 +493,6 @@ bool DEMO_APP::Run()
 	iDeviceContext->Map(constBuffer, 0, D3D11_MAP::D3D11_MAP_WRITE_DISCARD, NULL, &mapResource);
 	memcpy(mapResource.pData, &toShader_2, sizeof(toShader_2));
 	iDeviceContext->Unmap(constBuffer, 0);
-
 	iDeviceContext->VSSetConstantBuffers(0, 1, &constBuffer);
 
 	// TODO: PART 5 STEP 6
@@ -499,7 +513,7 @@ bool DEMO_APP::Run()
 	iDeviceContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY::D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 	iDeviceContext->Draw(vCount_Checkers, 0);
 	// TODO: PART 5 STEP 7
-	
+
 	// END PART 5
 
 	// TODO: PART 3 STEP 5
@@ -563,6 +577,14 @@ bool DEMO_APP::ShutDown()
 	vBuffer->Release();
 	constBuffer->Release();
 	checkers->Release();
+
+	lay_perspective->Release();
+	cBuff_perspective->Release();
+	VertSha_perspective->Release();
+	PixSha_perspective->Release();
+	vb_Cube->Release();
+	//vb_Grid->Release();
+
 
 
 	UnregisterClass( L"DirectXApplication", application ); 
