@@ -30,6 +30,9 @@ using namespace DirectX;
 #include "Trivial_PS.csh"
 #include "Trivial_VS.csh"
 
+#include "SampleVertexShader.csh"
+#include "SamplePixelShader.csh"
+
 #define BACKBUFFER_WIDTH	500
 #define BACKBUFFER_HEIGHT	500
 
@@ -44,16 +47,25 @@ class DEMO_APP
 	HWND							window;
 
 	XMFLOAT2 speed;
+	float turn;
 	
 	// Matrices
-	XMMATRIX view;
-	XMMATRIX Projection;
-	XMMATRIX CubeWorld;
+	XMFLOAT4X4 m_view;
+	XMMATRIX m_Projection;
+	XMFLOAT4X4 m_CubeWorld;
 
 	// Buffers
 	ID3D11Buffer *vb_Cube;
+	ID3D11Buffer *ib_Cube;
 	ID3D11Buffer *vb_Grid;
+	ID3D11Buffer *cBuff_perspective;
 	
+	// Layouts
+	ID3D11InputLayout *lay_perspective;
+
+	// Shaders
+	ID3D11VertexShader *VertSha_perspective;
+	ID3D11PixelShader *PixSha_perspective;
 	// Pending...
 
 
@@ -89,15 +101,27 @@ class DEMO_APP
 		XMFLOAT2 padding;
 	};
 
+	struct cbMirror_3D{
+		XMMATRIX model;
+		XMMATRIX view;
+		XMMATRIX projection;
+	};
+
 	// TODO: PART 3 STEP 4a
 	SEND_TO_VRAM toShader;
 	SEND_TO_VRAM toShader_2;
+	cbMirror_3D toShader_perspective;
 
 public:
 	// BEGIN PART 2
 	// TODO: PART 2 STEP 1
 	struct SIMPLE_VERTEX{
 		XMFLOAT2 POSITION;
+	};
+
+	struct VERTEX_3D{
+		XMFLOAT3 pos;
+		XMFLOAT4 col;
 	};
 	
 	DEMO_APP(HINSTANCE hinst, WNDPROC proc);
@@ -180,6 +204,111 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 	viewPort.MaxDepth = 1.0f;
 	viewPort.MinDepth = 0.0f;
 
+// <Mah 3D>
+	unsigned int indx = 0;
+
+	VERTEX_3D aTri[4] = { 
+			{ XMFLOAT3(0, 0.8f, 0), XMFLOAT4(1,1,1,1)},
+			{ XMFLOAT3(0.5f, 0, -0.4f),XMFLOAT4(0,1,0,1)},
+			{ XMFLOAT3(-0.5f, 0, -0.4f),XMFLOAT4(0,0,1,1)}, 
+			{ XMFLOAT3(0, 0, 0.6f), XMFLOAT4(1, 0, 0, 1)} 
+	};
+
+	D3D11_BUFFER_DESC desc_cube;
+	ZeroMemory(&desc_cube, sizeof(D3D11_BUFFER_DESC));
+	desc_cube.Usage = D3D11_USAGE::D3D11_USAGE_IMMUTABLE;
+	desc_cube.ByteWidth = sizeof(VERTEX_3D) * 4;
+	desc_cube.BindFlags = D3D11_BIND_FLAG::D3D11_BIND_VERTEX_BUFFER;
+
+	D3D11_SUBRESOURCE_DATA res_cube;
+	ZeroMemory(&res_cube, sizeof(D3D11_SUBRESOURCE_DATA));
+	res_cube.pSysMem = aTri;
+	iDevice->CreateBuffer(&desc_cube, &res_cube, &vb_Cube);
+
+	unsigned int indices[12];
+#if 1
+	bool flip = true;
+	for (unsigned int i = 0; i < 4; i++){
+		int e = i;
+		for (unsigned int laps = 0; laps < 3; laps++){
+			indices[indx++] = e;
+			if (flip){
+				if (++e > 3)
+					e = 0;
+			}
+			else{
+				if (--e < 0)
+					e = 3;
+			}
+		}
+		flip = !flip;
+	}
+#endif
+
+	D3D11_BUFFER_DESC indx_Cube_desc;
+	ZeroMemory(&indx_Cube_desc, sizeof(D3D11_BUFFER_DESC));
+	indx_Cube_desc.Usage = D3D11_USAGE::D3D11_USAGE_DEFAULT;
+	indx_Cube_desc.ByteWidth = sizeof(unsigned int)*12;
+	indx_Cube_desc.BindFlags = D3D11_BIND_FLAG::D3D11_BIND_INDEX_BUFFER;
+
+	D3D11_SUBRESOURCE_DATA indx_subRes_cube;
+	ZeroMemory(&indx_subRes_cube, sizeof(D3D11_SUBRESOURCE_DATA));
+	indx_subRes_cube.pSysMem = indices;
+
+	iDevice->CreateBuffer(&indx_Cube_desc, &indx_subRes_cube, &ib_Cube);
+
+	XMStoreFloat4x4(&m_CubeWorld,XMMatrixIdentity());
+
+	m_view = XMFLOAT4X4(
+		1.0f, 0.0f, 0.0f, 0.0f,
+		0.0f, 1.0f, 0.0f, 0.0f,
+		0.0f, 0.0f, 1.0f, 0.0f,
+		0.0f, 0.0f, -1.5f, 1.0f);
+
+	XMMATRIX rotation_trix;
+	XMMATRIX view = XMLoadFloat4x4(&m_view);
+	rotation_trix = XMMatrixRotationX(XMConvertToRadians(18));
+	view = XMMatrixMultiply(view, rotation_trix);
+	XMVECTOR determinant = XMMatrixDeterminant(view);
+	view = XMMatrixInverse(nullptr, view);
+	view = XMMatrixTranspose(view);
+	XMStoreFloat4x4(&m_view, view);
+
+	// zNear = 0.1;
+	// zFar = 10
+	// vFOV = 90
+	float aspect = BACKBUFFER_WIDTH / BACKBUFFER_HEIGHT;
+	m_Projection = XMMatrixPerspectiveFovLH(XMConvertToRadians(90.0f), aspect, 0.1f, 1000.0f);
+
+	toShader_perspective.projection = XMMatrixTranspose(m_Projection);
+	toShader_perspective.view = XMLoadFloat4x4(&m_view);	
+
+	XMMATRIX model = XMLoadFloat4x4(&m_CubeWorld);
+	model = XMMatrixTranslation(0, 0, 0);
+	toShader_perspective.model = XMMatrixTranspose(model);
+	XMStoreFloat4x4(&m_CubeWorld, model);
+
+
+	iDevice->CreateVertexShader(&SampleVertexShader, sizeof(SampleVertexShader), NULL, &VertSha_perspective);
+	iDevice->CreatePixelShader(&SamplePixelShader, sizeof(SamplePixelShader), NULL, &PixSha_perspective);
+
+	D3D11_INPUT_ELEMENT_DESC layout3d[2];
+	layout3d[0] = { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 };
+	layout3d[1] = { "COLOR", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 };
+
+	iDevice->CreateInputLayout(layout3d, 2, &SampleVertexShader, sizeof(SampleVertexShader), &lay_perspective);
+
+	D3D11_BUFFER_DESC cb_3d;
+	ZeroMemory(&cb_3d, sizeof(D3D11_BUFFER_DESC));
+	cb_3d.Usage = D3D11_USAGE_DYNAMIC;
+	cb_3d.ByteWidth = sizeof(cbMirror_3D);
+	cb_3d.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
+	cb_3d.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+	iDevice->CreateBuffer(&cb_3d, NULL, &cBuff_perspective);
+
+// <mah 3D />
+
+
 	// TODO: PART 2 STEP 3a 
 	SIMPLE_VERTEX mahCircle[360];
 	for (unsigned int i = 0; i < vCount_Crcl; ++i){
@@ -220,7 +349,7 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 	Zig[4] = XMFLOAT2(0.1f, -0.1f);
 	Zig[5] = XMFLOAT2(0.0f, -0.1f);
 
-	unsigned int indx = 0;
+	indx = 0;
 	XMFLOAT2 OFF = XMFLOAT2(-0.9f,1.0f);
 	for (; OFF.y > -0.99999f; OFF.y -= 0.1f){
 		for (; OFF.x < 0.99999f; OFF.x += 0.2f){
@@ -243,7 +372,6 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 		}
 		OFF.x -= 1.9f;
 	}
-
 	// TODO: PART 5 STEP 3
 	D3D11_BUFFER_DESC checkDesc;
 	ZeroMemory(&checkDesc, sizeof(D3D11_BUFFER_DESC));
@@ -294,6 +422,8 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 
 	speed.x = 1;
 	speed.y = 1;
+	turn = 0.07f;
+	timeX.Throttle(60);
 
 }
 
@@ -306,19 +436,8 @@ bool DEMO_APP::Run()
 	// TODO: PART 4 STEP 2	
 	timeX.Signal();
 
-	MSG msg; ZeroMemory(&msg, sizeof(msg));
-	if (PeekMessage(&msg, window, WM_MOUSEMOVE, WM_MOUSEMOVE, PM_REMOVE)) {
-		int x, y;
-		x = (msg.lParam & 0xFFFF);
-		y = ((msg.lParam & 0xFFFF0000) >> 16);
-		toShader.constantOffset.x = (static_cast<float>(x) / (BACKBUFFER_WIDTH*0.5f)) - 1;
-		toShader.constantOffset.y = -((static_cast<float>(y) / (BACKBUFFER_HEIGHT*0.5f)) - 1);
 
-	}
-	else {
-
-		// TODO: PART 4 STEP 3
-
+	// TODO: PART 4 STEP 3
 	//NOTE: speed is declared in the class declaration at the top.Assingment is done in the end of the constructor.
 		speed.x = static_cast<float>(1.0f*timeX.Delta() * (speed.x < 0 ? -1 : 1));
 		  speed.y = static_cast<float>(0.5f*timeX.Delta() * (speed.y < 0 ? -1 : 1));
@@ -335,7 +454,7 @@ bool DEMO_APP::Run()
 			  speed.y *= -1;
 			  toShader.constantOffset.y += speed.y;
 		  }
-	}
+	
 
 	// END PART 4
 
@@ -349,21 +468,56 @@ bool DEMO_APP::Run()
 	FLOAT DarkBlue[] = { 0.0f, 0.0f, 0.45f, 1.0f };
 	iDeviceContext->ClearRenderTargetView(iRenderTarget, DarkBlue);
 
+// <Mah 3d>
+	XMMATRIX cubeWorld= XMLoadFloat4x4(&m_CubeWorld);
+	cubeWorld = XMMatrixRotationY(XMConvertToRadians(turn))*cubeWorld;
+	toShader_perspective.model = XMMatrixTranspose(cubeWorld);
+	XMStoreFloat4x4(&m_CubeWorld, cubeWorld);
+
+	//ZeroMemory(&toShader_perspective, sizeof(cbMirror_3D));
+	D3D11_MAPPED_SUBRESOURCE map_cube;
+	ZeroMemory(&map_cube, sizeof(D3D11_MAPPED_SUBRESOURCE));
+	iDeviceContext->Map(cBuff_perspective, 0, D3D11_MAP::D3D11_MAP_WRITE_DISCARD, NULL, &map_cube);
+	memcpy(map_cube.pData, &toShader_perspective, sizeof(toShader_perspective));
+	iDeviceContext->Unmap(cBuff_perspective, 0);
+	iDeviceContext->VSSetConstantBuffers(0, 1, &cBuff_perspective);
+
+	UINT _startSlot = 0;
+	UINT _numBuffs = 1;
+	UINT _strides[D3D11_IA_VERTEX_INPUT_RESOURCE_SLOT_COUNT];
+	UINT _offSets[D3D11_IA_VERTEX_INPUT_RESOURCE_SLOT_COUNT];
+	ZeroMemory(_strides, sizeof(_strides));
+	ZeroMemory(_offSets, sizeof(_offSets));
+	_strides[0] = static_cast<UINT>(sizeof(VERTEX_3D));
+	iDeviceContext->IASetVertexBuffers(0, 1, &vb_Cube, _strides, _offSets);
+
+	iDeviceContext->IASetIndexBuffer(ib_Cube, DXGI_FORMAT::DXGI_FORMAT_R32_UINT, 0);
+
+	iDeviceContext->VSSetShader(VertSha_perspective, NULL, NULL);
+	iDeviceContext->PSSetShader(PixSha_perspective, NULL, NULL);
+
+	iDeviceContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY::D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+	iDeviceContext->IASetInputLayout(lay_perspective);
+	iDeviceContext->DrawIndexed(12, 0, 0);
+
+// <Mah 3d/>
+
+#if 0
 	// TODO: PART 5 STEP 4
 	ZeroMemory(&toShader_2, sizeof(SEND_TO_VRAM));
-
 	// TODO: PART 5 STEP 5
 	D3D11_MAPPED_SUBRESOURCE mapResource;
 	ZeroMemory(&mapResource, sizeof(mapResource));
 	iDeviceContext->Map(constBuffer, 0, D3D11_MAP::D3D11_MAP_WRITE_DISCARD, NULL, &mapResource);
 	memcpy(mapResource.pData, &toShader_2, sizeof(toShader_2));
 	iDeviceContext->Unmap(constBuffer, 0);
+	iDeviceContext->VSSetConstantBuffers(0, 1, &constBuffer);
 
 	// TODO: PART 5 STEP 6
-	UINT _startSlot = 0;
-	UINT _numBuffs = 1;
-	UINT _strides[D3D11_IA_VERTEX_INPUT_RESOURCE_SLOT_COUNT];
-	UINT _offSets[D3D11_IA_VERTEX_INPUT_RESOURCE_SLOT_COUNT];
+	_startSlot = 0;
+	_numBuffs = 1;
+	_strides[D3D11_IA_VERTEX_INPUT_RESOURCE_SLOT_COUNT];
+	_offSets[D3D11_IA_VERTEX_INPUT_RESOURCE_SLOT_COUNT];
 	ZeroMemory(_strides, sizeof(_strides));
 	ZeroMemory(_offSets, sizeof(_offSets));
 	_strides[0] = static_cast<UINT>(sizeof(SIMPLE_VERTEX));
@@ -377,9 +531,9 @@ bool DEMO_APP::Run()
 	iDeviceContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY::D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 	iDeviceContext->Draw(vCount_Checkers, 0);
 	// TODO: PART 5 STEP 7
-	
+
 	// END PART 5
-	
+
 	// TODO: PART 3 STEP 5
 	ZeroMemory(&mapResource, sizeof(mapResource));
 	iDeviceContext->Map(constBuffer, 0, D3D11_MAP::D3D11_MAP_WRITE_DISCARD, NULL, &mapResource );
@@ -411,6 +565,7 @@ bool DEMO_APP::Run()
 
 	// TODO: PART 2 STEP 10
 	iDeviceContext->Draw(vCount_Crcl, 0);
+#endif
 
 	// END PART 2
 
@@ -433,13 +588,21 @@ bool DEMO_APP::ShutDown()
 	swapChain->Release();
 	iDeviceContext->Release();
 
-
 	iLayout->Release();
 	iVertShader->Release();
 	iPixShader->Release();
 	vBuffer->Release();
 	constBuffer->Release();
 	checkers->Release();
+
+	lay_perspective->Release();
+	cBuff_perspective->Release();
+	VertSha_perspective->Release();
+	PixSha_perspective->Release();
+	vb_Cube->Release();
+	ib_Cube->Release();
+	//vb_Grid->Release();
+
 
 
 	UnregisterClass( L"DirectXApplication", application ); 
@@ -462,7 +625,7 @@ int WINAPI wWinMain( HINSTANCE hInstance, HINSTANCE, LPTSTR, int )
     MSG msg; ZeroMemory( &msg, sizeof( msg ) );
     while ( msg.message != WM_QUIT && myApp.Run() )
     {	
-	    if ( PeekMessage( &msg, NULL, 0, 0, PM_NOREMOVE ) )
+	    if ( PeekMessage( &msg, NULL, 0, 0, PM_REMOVE ) )
         { 
             TranslateMessage( &msg );
             DispatchMessage( &msg ); 
