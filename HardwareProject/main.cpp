@@ -257,7 +257,7 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 	toShader_perspective.view = XMLoadFloat4x4(&m_view);	
 
 	XMMATRIX model = XMLoadFloat4x4(&m_CubeWorld);
-	model = XMMatrixTranslation(0, 0, 0);
+	model = XMMatrixTranslation(0.3f, 0, 0);
 	toShader_perspective.model = XMMatrixTranspose(model);
 	XMStoreFloat4x4(&m_CubeWorld, model);
 
@@ -281,7 +281,7 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 
 // <mah 3D />
 
-	turn = 0.05f;
+	turn = 0.04f;
 	timeX.Throttle(60);
 
 }
