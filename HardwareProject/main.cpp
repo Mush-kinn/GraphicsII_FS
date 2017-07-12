@@ -56,6 +56,7 @@ class DEMO_APP
 
 	// Buffers
 	ID3D11Buffer *vb_Cube;
+	ID3D11Buffer *ib_Cube;
 	ID3D11Buffer *vb_Grid;
 	ID3D11Buffer *cBuff_perspective;
 	
@@ -205,28 +206,32 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 
 // <Mah 3D>
 	unsigned int indx = 0;
-	XMFLOAT3 aTri[4] = { XMFLOAT3(0, 0.8f, 0), XMFLOAT3(0.5f, 0, -0.4f), XMFLOAT3(-0.5f, 0, -0.4f), XMFLOAT3(0, 0, 0.6f) };
-#if 0
-	VERTEX_3D testTri[3];
-	testTri[0].pos = XMFLOAT3(0, 0.8f, 0);
-	testTri[0].col = XMFLOAT4(1, 1, 1, 1);
 
-	testTri[1].pos = XMFLOAT3(1, 0, 0);
-	testTri[1].col = XMFLOAT4(1, 1, 1, 1);
+	VERTEX_3D aTri[4] = { 
+			{ XMFLOAT3(0, 0.8f, 0), XMFLOAT4(1,1,1,1)},
+			{ XMFLOAT3(0.5f, 0, -0.4f),XMFLOAT4(0,1,0,1)},
+			{ XMFLOAT3(-0.5f, 0, -0.4f),XMFLOAT4(0,0,1,1)}, 
+			{ XMFLOAT3(0, 0, 0.6f), XMFLOAT4(1, 0, 0, 1)} 
+	};
 
-	testTri[2].pos = XMFLOAT3(-1, 0, 0);
-	testTri[2].col = XMFLOAT4(1, 1, 1, 1);
-#endif 
+	D3D11_BUFFER_DESC desc_cube;
+	ZeroMemory(&desc_cube, sizeof(D3D11_BUFFER_DESC));
+	desc_cube.Usage = D3D11_USAGE::D3D11_USAGE_IMMUTABLE;
+	desc_cube.ByteWidth = sizeof(VERTEX_3D) * 4;
+	desc_cube.BindFlags = D3D11_BIND_FLAG::D3D11_BIND_VERTEX_BUFFER;
 
+	D3D11_SUBRESOURCE_DATA res_cube;
+	ZeroMemory(&res_cube, sizeof(D3D11_SUBRESOURCE_DATA));
+	res_cube.pSysMem = aTri;
+	iDevice->CreateBuffer(&desc_cube, &res_cube, &vb_Cube);
 
+	unsigned int indices[12];
 #if 1
-	VERTEX_3D fourSidedTri[12];
 	bool flip = true;
 	for (unsigned int i = 0; i < 4; i++){
 		int e = i;
 		for (unsigned int laps = 0; laps < 3; laps++){
-			fourSidedTri[indx].pos = aTri[e];
-			fourSidedTri[indx++].col = XMFLOAT4(0.8f, 0.5f, 0.0f,1.0f);
+			indices[indx++] = e;
 			if (flip){
 				if (++e > 3)
 					e = 0;
@@ -240,17 +245,17 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 	}
 #endif
 
-	D3D11_BUFFER_DESC desc_cube;
-	ZeroMemory(&desc_cube, sizeof(D3D11_BUFFER_DESC));
-	desc_cube.Usage = D3D11_USAGE::D3D11_USAGE_IMMUTABLE;
-	desc_cube.ByteWidth = sizeof(VERTEX_3D) * 12;
-	desc_cube.BindFlags = D3D11_BIND_FLAG::D3D11_BIND_VERTEX_BUFFER;
+	D3D11_BUFFER_DESC indx_Cube_desc;
+	ZeroMemory(&indx_Cube_desc, sizeof(D3D11_BUFFER_DESC));
+	indx_Cube_desc.Usage = D3D11_USAGE::D3D11_USAGE_DEFAULT;
+	indx_Cube_desc.ByteWidth = sizeof(unsigned int)*12;
+	indx_Cube_desc.BindFlags = D3D11_BIND_FLAG::D3D11_BIND_INDEX_BUFFER;
 
-	D3D11_SUBRESOURCE_DATA res_cube;
-	ZeroMemory(&res_cube, sizeof(D3D11_SUBRESOURCE_DATA));
-	res_cube.pSysMem = fourSidedTri;
+	D3D11_SUBRESOURCE_DATA indx_subRes_cube;
+	ZeroMemory(&indx_subRes_cube, sizeof(D3D11_SUBRESOURCE_DATA));
+	indx_subRes_cube.pSysMem = indices;
 
-	iDevice->CreateBuffer(&desc_cube, &res_cube, &vb_Cube);
+	iDevice->CreateBuffer(&indx_Cube_desc, &indx_subRes_cube, &ib_Cube);
 
 	XMStoreFloat4x4(&m_CubeWorld,XMMatrixIdentity());
 
@@ -417,7 +422,8 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 
 	speed.x = 1;
 	speed.y = 1;
-	turn = 0.02f;
+	turn = 0.07f;
+	timeX.Throttle(60);
 
 }
 
@@ -485,12 +491,14 @@ bool DEMO_APP::Run()
 	_strides[0] = static_cast<UINT>(sizeof(VERTEX_3D));
 	iDeviceContext->IASetVertexBuffers(0, 1, &vb_Cube, _strides, _offSets);
 
+	iDeviceContext->IASetIndexBuffer(ib_Cube, DXGI_FORMAT::DXGI_FORMAT_R32_UINT, 0);
+
 	iDeviceContext->VSSetShader(VertSha_perspective, NULL, NULL);
 	iDeviceContext->PSSetShader(PixSha_perspective, NULL, NULL);
 
 	iDeviceContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY::D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 	iDeviceContext->IASetInputLayout(lay_perspective);
-	iDeviceContext->Draw(12, 0);
+	iDeviceContext->DrawIndexed(12, 0, 0);
 
 // <Mah 3d/>
 
@@ -592,6 +600,7 @@ bool DEMO_APP::ShutDown()
 	VertSha_perspective->Release();
 	PixSha_perspective->Release();
 	vb_Cube->Release();
+	ib_Cube->Release();
 	//vb_Grid->Release();
 
 
