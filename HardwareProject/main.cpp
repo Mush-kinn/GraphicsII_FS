@@ -66,6 +66,11 @@ class DEMO_APP
 	// Pending...
 
 
+	ID3D11Device *iDevice;
+	ID3D11DeviceContext *iDeviceContext;
+	ID3D11RenderTargetView *iRenderTarget;
+	D3D11_VIEWPORT viewPort;
+	IDXGISwapChain *swapChain;
 	struct SEND_TO_VRAM
 	{
 		XMFLOAT4 constantColor;
