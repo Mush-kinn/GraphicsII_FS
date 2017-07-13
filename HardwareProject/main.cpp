@@ -23,6 +23,8 @@ using namespace std;
 #pragma comment(lib,"d3d11.lib")
 #include <DirectXMath.h>
 using namespace DirectX;
+#include "Assets\Test_UV_Map.h"
+
 
 #include "Trivial_PS.csh"
 #include "Trivial_VS.csh"
@@ -32,6 +34,13 @@ using namespace DirectX;
 
 #define BACKBUFFER_WIDTH	500
 #define BACKBUFFER_HEIGHT	500
+
+// Warning: Testure #defines, keep collapsed. 
+#pragma region WARNING_TexttureArraysDefines
+
+#define TEST_UV_MAP_PIXELS Test_UV_Map_pixels
+
+#pragma endregion
 
 //************************************************************
 //************ SIMPLE WINDOWS APP CLASS **********************
@@ -63,6 +72,10 @@ class DEMO_APP
 	// Shaders
 	ID3D11VertexShader *VertSha_perspective;
 	ID3D11PixelShader *PixSha_perspective;
+
+	// textures
+	ID3D11Texture2D *tx_UVMap;
+
 	// Pending...
 
 
@@ -78,15 +91,14 @@ class DEMO_APP
 		XMFLOAT2 padding;
 	};
 
-	struct cbMirror_3D{
+	struct cbMirror_Perspective{
 		XMMATRIX model;
 		XMMATRIX view;
 		XMMATRIX projection;
 	};
 
-
 	SEND_TO_VRAM toShader;
-	cbMirror_3D toShader_perspective;
+	cbMirror_Perspective toShader_perspective;
 
 public:
 
@@ -154,6 +166,13 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 	UINT               numLevelsRequested = 1;
 	D3D_FEATURE_LEVEL  FeatureLevelsSupported;
 
+	D3D11_TEXTURE2D_DESC tx_UV_Desc;
+	ZeroMemory(&tx_UV_Desc, sizeof(D3D11_TEXTURE2D_DESC));
+
+	D3D11_SUBRESOURCE_DATA tx_UV_Data;
+
+
+	iDevice->CreateTexture2D(&tx_UV_Desc, &tx_UV_Data, &tx_UVMap);
 
 #if _DEBUG
 	D3D11CreateDeviceAndSwapChain(NULL, D3D_DRIVER_TYPE_HARDWARE, NULL, D3D11_CREATE_DEVICE_DEBUG, 
@@ -169,8 +188,8 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 	ZeroMemory(&iResource, sizeof(ID3D10Resource));
 	swapChain->GetBuffer(0, __uuidof(iResource), reinterpret_cast<void**>(&iResource));
 	iDevice->CreateRenderTargetView(iResource, NULL, &iRenderTarget);
-	iResource->Release();
-	
+	iResource->Release(); 
+	 
 
 	swapChain->GetDesc(&chainDesc);
 	ZeroMemory(&viewPort, sizeof(D3D11_VIEWPORT));
@@ -252,8 +271,8 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 	// vFOV = 90
 	float aspect = BACKBUFFER_WIDTH / BACKBUFFER_HEIGHT;
 	m_Projection = XMMatrixPerspectiveFovLH(XMConvertToRadians(90.0f), aspect, 0.1f, 1000.0f);
-
 	toShader_perspective.projection = XMMatrixTranspose(m_Projection);
+
 	toShader_perspective.view = XMLoadFloat4x4(&m_view);	
 
 	XMMATRIX model = XMLoadFloat4x4(&m_CubeWorld);
@@ -274,7 +293,7 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 	D3D11_BUFFER_DESC cb_3d;
 	ZeroMemory(&cb_3d, sizeof(D3D11_BUFFER_DESC));
 	cb_3d.Usage = D3D11_USAGE_DYNAMIC;
-	cb_3d.ByteWidth = sizeof(cbMirror_3D);
+	cb_3d.ByteWidth = sizeof(cbMirror_Perspective);
 	cb_3d.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
 	cb_3d.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
 	iDevice->CreateBuffer(&cb_3d, NULL, &cBuff_perspective);
@@ -323,7 +342,7 @@ bool DEMO_APP::Run()
 	iDeviceContext->IASetVertexBuffers(0, 1, &vb_Cube, _strides, _offSets);
 
 	iDeviceContext->IASetIndexBuffer(ib_Cube, DXGI_FORMAT::DXGI_FORMAT_R32_UINT, 0);
-
+	 
 	iDeviceContext->VSSetShader(VertSha_perspective, NULL, NULL);
 	iDeviceContext->PSSetShader(PixSha_perspective, NULL, NULL);
 

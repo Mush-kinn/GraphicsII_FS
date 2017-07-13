@@ -26,16 +26,15 @@
     <ClInclude Include="XTime.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="Assets\Test_UV_Map.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="Trivial_PS.hlsl" />
     <FxCompile Include="Trivial_VS.hlsl" />
-    <FxCompile Include="SamplePixelShader.hlsl">
-      <Filter>Source Files</Filter>
-    </FxCompile>
-    <FxCompile Include="SampleVertexShader.hlsl">
-      <Filter>Source Files</Filter>
-    </FxCompile>
+    <FxCompile Include="SampleVertexShader.hlsl" />
+    <FxCompile Include="SamplePixelShader.hlsl" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Trivial_VS.csh">
@@ -50,5 +49,10 @@
     <None Include="SampleVertexShader.csh">
       <Filter>Source Files</Filter>
     </None>
+  </ItemGroup>
+  <ItemGroup>
+    <Image Include="Assets\Test_UV_Map.dds">
+      <Filter>Resource Files</Filter>
+    </Image>
   </ItemGroup>
 </Project>
