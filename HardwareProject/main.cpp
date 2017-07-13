@@ -78,15 +78,14 @@ class DEMO_APP
 		XMFLOAT2 padding;
 	};
 
-	struct cbMirror_3D{
+	struct cbMirror_Perspective{
 		XMMATRIX model;
 		XMMATRIX view;
 		XMMATRIX projection;
 	};
 
-
 	SEND_TO_VRAM toShader;
-	cbMirror_3D toShader_perspective;
+	cbMirror_Perspective toShader_perspective;
 
 public:
 
@@ -252,8 +251,8 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 	// vFOV = 90
 	float aspect = BACKBUFFER_WIDTH / BACKBUFFER_HEIGHT;
 	m_Projection = XMMatrixPerspectiveFovLH(XMConvertToRadians(90.0f), aspect, 0.1f, 1000.0f);
-
 	toShader_perspective.projection = XMMatrixTranspose(m_Projection);
+
 	toShader_perspective.view = XMLoadFloat4x4(&m_view);	
 
 	XMMATRIX model = XMLoadFloat4x4(&m_CubeWorld);
@@ -274,7 +273,7 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 	D3D11_BUFFER_DESC cb_3d;
 	ZeroMemory(&cb_3d, sizeof(D3D11_BUFFER_DESC));
 	cb_3d.Usage = D3D11_USAGE_DYNAMIC;
-	cb_3d.ByteWidth = sizeof(cbMirror_3D);
+	cb_3d.ByteWidth = sizeof(cbMirror_Perspective);
 	cb_3d.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
 	cb_3d.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
 	iDevice->CreateBuffer(&cb_3d, NULL, &cBuff_perspective);
