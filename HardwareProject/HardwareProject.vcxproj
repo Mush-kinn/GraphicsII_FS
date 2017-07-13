@@ -163,6 +163,7 @@
     <ClCompile Include="XTime.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Assets\Test_UV_Map.h" />
     <ClInclude Include="XTime.h" />
   </ItemGroup>
   <ItemGroup>
@@ -196,6 +197,9 @@
     <None Include="SampleVertexShader.csh" />
     <None Include="Trivial_PS.csh" />
     <None Include="Trivial_VS.csh" />
+  </ItemGroup>
+  <ItemGroup>
+    <Image Include="Assets\Test_UV_Map.dds" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
