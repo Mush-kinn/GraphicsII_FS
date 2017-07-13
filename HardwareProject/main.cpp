@@ -76,12 +76,16 @@ class DEMO_APP
 	// textures
 	ID3D11Texture2D *tx_UVMap;
 
+	// Views
+	ID3D11RenderTargetView *iRenderTarget;
+	ID3D11ShaderResourceView *ShaderView;
+
 	// Pending...
+	ID3D11SamplerState *SampleState;
 
 
 	ID3D11Device *iDevice;
 	ID3D11DeviceContext *iDeviceContext;
-	ID3D11RenderTargetView *iRenderTarget;
 	D3D11_VIEWPORT viewPort;
 	IDXGISwapChain *swapChain;
 	struct SEND_TO_VRAM
@@ -108,7 +112,7 @@ public:
 
 	struct VERTEX_3D{
 		XMFLOAT3 pos;
-		XMFLOAT4 col;
+		XMFLOAT2 uv;
 	};
 	
 	DEMO_APP(HINSTANCE hinst, WNDPROC proc);
@@ -166,14 +170,6 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 	UINT               numLevelsRequested = 1;
 	D3D_FEATURE_LEVEL  FeatureLevelsSupported;
 
-	D3D11_TEXTURE2D_DESC tx_UV_Desc;
-	ZeroMemory(&tx_UV_Desc, sizeof(D3D11_TEXTURE2D_DESC));
-
-	D3D11_SUBRESOURCE_DATA tx_UV_Data;
-
-
-	iDevice->CreateTexture2D(&tx_UV_Desc, &tx_UV_Data, &tx_UVMap);
-
 #if _DEBUG
 	D3D11CreateDeviceAndSwapChain(NULL, D3D_DRIVER_TYPE_HARDWARE, NULL, D3D11_CREATE_DEVICE_DEBUG, 
 		&FeatureLevelsRequested, numLevelsRequested, D3D11_SDK_VERSION, &chainDesc, &swapChain, 
@@ -184,12 +180,55 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 		&iDevice, &FeatureLevelsSupported, &iDeviceContext);
 #endif
 
+	D3D11_SAMPLER_DESC sampler_desc;
+	ZeroMemory(&sampler_desc, sizeof(D3D11_SAMPLER_DESC));
+	sampler_desc.Filter = D3D11_FILTER::D3D11_FILTER_MIN_MAG_MIP_LINEAR;
+	sampler_desc.AddressU = D3D11_TEXTURE_ADDRESS_WRAP;
+	sampler_desc.AddressV = D3D11_TEXTURE_ADDRESS_WRAP;
+	sampler_desc.AddressW = D3D11_TEXTURE_ADDRESS_WRAP;
+	sampler_desc.MinLOD = 0;
+	sampler_desc.MaxLOD = Test_UV_Map_numlevels;
+	sampler_desc.ComparisonFunc = D3D11_COMPARISON_FUNC::D3D11_COMPARISON_GREATER_EQUAL;
+	
+	iDevice->CreateSamplerState(&sampler_desc, &SampleState);
+	
+	D3D11_TEXTURE2D_DESC tx_UV_Desc;
+	ZeroMemory(&tx_UV_Desc, sizeof(D3D11_TEXTURE2D_DESC));
+	tx_UV_Desc.Usage = D3D11_USAGE::D3D11_USAGE_IMMUTABLE;
+	tx_UV_Desc.Format = DXGI_FORMAT::DXGI_FORMAT_B8G8R8A8_UNORM_SRGB;
+	tx_UV_Desc.BindFlags = D3D11_BIND_FLAG::D3D11_BIND_SHADER_RESOURCE;
+	tx_UV_Desc.ArraySize = 1;
+	tx_UV_Desc.MipLevels = Test_UV_Map_numlevels;
+	tx_UV_Desc.Height = Test_UV_Map_height;
+	tx_UV_Desc.Width = Test_UV_Map_width;
+	tx_UV_Desc.SampleDesc.Count = 1;
+
+	D3D11_SUBRESOURCE_DATA tx_UV_Data[Test_UV_Map_numlevels];
+	for (unsigned int i = 0; i < Test_UV_Map_numlevels; ++i){
+		ZeroMemory(&tx_UV_Data[i], sizeof(tx_UV_Data[i]));
+		tx_UV_Data[i].pSysMem = &TEST_UV_MAP_PIXELS[Test_UV_Map_leveloffsets[i]];
+		tx_UV_Data[i].SysMemPitch = (Test_UV_Map_width >> i) * sizeof(unsigned int);
+	}
+
+	iDevice->CreateTexture2D(&tx_UV_Desc, tx_UV_Data, &tx_UVMap);
+
+	D3D11_SHADER_RESOURCE_VIEW_DESC Shaderview_desc;
+	ZeroMemory(&Shaderview_desc, sizeof(D3D11_SHADER_RESOURCE_VIEW_DESC));
+	Shaderview_desc.Format = DXGI_FORMAT::DXGI_FORMAT_B8G8R8A8_UNORM_SRGB;
+	Shaderview_desc.ViewDimension = D3D11_SRV_DIMENSION::D3D11_SRV_DIMENSION_TEXTURE2DARRAY;
+	Shaderview_desc.Texture2DArray.ArraySize = 1;
+	Shaderview_desc.Texture2DArray.FirstArraySlice = 0;
+	Shaderview_desc.Texture2DArray.MipLevels = Test_UV_Map_numlevels;
+	Shaderview_desc.Texture2DArray.MostDetailedMip = 0;
+
+	iDevice->CreateShaderResourceView(tx_UVMap, &Shaderview_desc, &ShaderView);
+
 	ID3D11Resource *iResource;
 	ZeroMemory(&iResource, sizeof(ID3D10Resource));
 	swapChain->GetBuffer(0, __uuidof(iResource), reinterpret_cast<void**>(&iResource));
 	iDevice->CreateRenderTargetView(iResource, NULL, &iRenderTarget);
 	iResource->Release(); 
-	 
+
 
 	swapChain->GetDesc(&chainDesc);
 	ZeroMemory(&viewPort, sizeof(D3D11_VIEWPORT));
@@ -202,10 +241,10 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 	unsigned int indx = 0;
 
 	VERTEX_3D aTri[4] = { 
-			{ XMFLOAT3(0, 0.8f, 0), XMFLOAT4(1,1,1,1)},
-			{ XMFLOAT3(0.5f, 0, -0.4f),XMFLOAT4(0,1,0,1)},
-			{ XMFLOAT3(-0.5f, 0, -0.4f),XMFLOAT4(0,0,1,1)}, 
-			{ XMFLOAT3(0, 0, 0.6f), XMFLOAT4(1, 0, 0, 1)} 
+			{ XMFLOAT3(0, 0.8f, 0), XMFLOAT2(0.5f, 0)},
+			{ XMFLOAT3(0.7f, 0, -0.4f),XMFLOAT2(1,1)},
+			{ XMFLOAT3(-0.7f, 0, -0.4f),XMFLOAT2(0,1)}, 
+			{ XMFLOAT3(0, 0.4f, 0), XMFLOAT2( 0.5f,0.5 )} 
 	};
 
 	D3D11_BUFFER_DESC desc_cube;
@@ -276,7 +315,7 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 	toShader_perspective.view = XMLoadFloat4x4(&m_view);	
 
 	XMMATRIX model = XMLoadFloat4x4(&m_CubeWorld);
-	model = XMMatrixTranslation(0.3f, 0, 0);
+	model = XMMatrixTranslation(0, 0, -0.25f);
 	toShader_perspective.model = XMMatrixTranspose(model);
 	XMStoreFloat4x4(&m_CubeWorld, model);
 
@@ -286,7 +325,7 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 
 	D3D11_INPUT_ELEMENT_DESC layout3d[2];
 	layout3d[0] = { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 };
-	layout3d[1] = { "COLOR", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 };
+	layout3d[1] = { "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 };
 
 	iDevice->CreateInputLayout(layout3d, 2, &SampleVertexShader, sizeof(SampleVertexShader), &lay_perspective);
 
@@ -300,7 +339,7 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 
 // <mah 3D />
 
-	turn = 0.04f;
+	turn = 0.004f;
 	timeX.Throttle(60);
 
 }
@@ -342,6 +381,9 @@ bool DEMO_APP::Run()
 	iDeviceContext->IASetVertexBuffers(0, 1, &vb_Cube, _strides, _offSets);
 
 	iDeviceContext->IASetIndexBuffer(ib_Cube, DXGI_FORMAT::DXGI_FORMAT_R32_UINT, 0);
+
+	iDeviceContext->PSSetSamplers(0, 1, &SampleState);
+	iDeviceContext->PSSetShaderResources(0, 1, &ShaderView);
 	 
 	iDeviceContext->VSSetShader(VertSha_perspective, NULL, NULL);
 	iDeviceContext->PSSetShader(PixSha_perspective, NULL, NULL);
@@ -375,7 +417,10 @@ bool DEMO_APP::ShutDown()
 	PixSha_perspective->Release();
 	vb_Cube->Release();
 	ib_Cube->Release();
-	//vb_Grid->Release();
+	
+	ShaderView->Release();
+	tx_UVMap->Release();
+	SampleState->Release();
 
 	UnregisterClass( L"DirectXApplication", application ); 
 	return true;
