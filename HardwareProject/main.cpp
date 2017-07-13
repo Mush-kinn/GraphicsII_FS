@@ -100,7 +100,7 @@ class DEMO_APP
 		XMMATRIX view;
 		XMMATRIX projection;
 	};
-
+	
 	SEND_TO_VRAM toShader;
 	cbMirror_Perspective toShader_perspective;
 
@@ -354,8 +354,19 @@ bool DEMO_APP::Run()
 	timeX.Signal();
 
 	iDeviceContext->OMSetRenderTargets(1, &iRenderTarget, NULL);
-	iDeviceContext->RSSetViewports(1, &viewPort);
+
+	D3D11_VIEWPORT tempView;
+	tempView.Height = BACKBUFFER_HEIGHT * 0.5f;
+	tempView.Width = BACKBUFFER_WIDTH * 0.5f;
+	tempView.TopLeftX = 0;
+	tempView.TopLeftY = BACKBUFFER_WIDTH * 0.25f;
+	tempView.MaxDepth = 1;
+	tempView.MinDepth = 0;
+
 	FLOAT DarkBlue[] = { 0.0f, 0.0f, 0.45f, 1.0f };
+	FLOAT Black[] = { 0.0f, 0.0f, 0.0f, 1.0f };
+
+	iDeviceContext->RSSetViewports(1, &viewPort);
 	iDeviceContext->ClearRenderTargetView(iRenderTarget, DarkBlue);
 
 // <Mah 3d>
@@ -393,6 +404,22 @@ bool DEMO_APP::Run()
 	iDeviceContext->DrawIndexed(12, 0, 0);
 
 // <Mah 3d/>
+
+// <MultiViewport>
+	cbMirror_Perspective tempMirror;
+	tempMirror = toShader_perspective;
+	float aspect = BACKBUFFER_WIDTH / BACKBUFFER_HEIGHT;
+	tempMirror.projection = XMMatrixTranspose(XMMatrixPerspectiveFovLH(XMConvertToRadians(110.0f), aspect, 0.1f, 1000.0f));
+	ZeroMemory(&map_cube, sizeof(D3D11_MAPPED_SUBRESOURCE));
+	iDeviceContext->Map(cBuff_perspective, 0, D3D11_MAP::D3D11_MAP_WRITE_DISCARD, NULL, &map_cube);
+	memcpy(map_cube.pData, &tempMirror, sizeof(tempMirror));
+	iDeviceContext->Unmap(cBuff_perspective, 0);
+	iDeviceContext->VSSetConstantBuffers(0, 1, &cBuff_perspective);
+
+	iDeviceContext->RSSetViewports(1, &tempView);
+	iDeviceContext->DrawIndexed(12, 0, 0);
+// <MultiViewport/>
+
 
 	swapChain->Present(0, 0);
 
