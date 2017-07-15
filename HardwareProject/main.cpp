@@ -35,6 +35,9 @@ using namespace DirectX;
 #define BACKBUFFER_WIDTH	500
 #define BACKBUFFER_HEIGHT	500
 
+#define HOVERCAM_WITDH (BACKBUFFER_WIDTH * 0.25)
+#define HOVERCAM_HEIGHT (BACKBUFFER_HEIGHT * 0.25)
+
 // Warning: Testure #defines, keep collapsed. 
 #pragma region WARNING_TexttureArraysDefines
 
@@ -60,11 +63,13 @@ class DEMO_APP
 	XMFLOAT4X4 m_view;
 	XMMATRIX m_Projection;
 	XMFLOAT4X4 m_CubeWorld;
+	XMFLOAT4X4 m_hoverCam;
 
 	// Buffers
 	ID3D11Buffer *vb_Cube;
 	ID3D11Buffer *ib_Cube;
 	ID3D11Buffer *cBuff_perspective;
+
 	
 	// Layouts
 	ID3D11InputLayout *lay_perspective;
@@ -82,7 +87,7 @@ class DEMO_APP
 
 	// Pending...
 	ID3D11SamplerState *SampleState;
-
+	D3D11_VIEWPORT hovCam_view;
 
 	ID3D11Device *iDevice;
 	ID3D11DeviceContext *iDeviceContext;
@@ -103,6 +108,7 @@ class DEMO_APP
 	
 	SEND_TO_VRAM toShader;
 	cbMirror_Perspective toShader_perspective;
+	cbMirror_Perspective toshader_hoverCam;
 
 public:
 
@@ -237,6 +243,17 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 	viewPort.MaxDepth = 1.0f;
 	viewPort.MinDepth = 0.0f;
 
+// <Mah hovercam>
+	ZeroMemory(&hovCam_view, sizeof(hovCam_view));
+	hovCam_view.Height = HOVERCAM_HEIGHT;
+	hovCam_view.Width = HOVERCAM_WITDH;
+	hovCam_view.TopLeftX = BACKBUFFER_WIDTH * 0.65;
+	hovCam_view.TopLeftY = BACKBUFFER_HEIGHT * 0.75;
+	hovCam_view.MinDepth = 0.0f;
+	hovCam_view.MaxDepth = 1.0f;
+
+// <mah hovercam/>
+
 // <Mah 3D>
 	unsigned int indx = 0;
 
@@ -300,7 +317,6 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 	XMMATRIX view = XMLoadFloat4x4(&m_view);
 	rotation_trix = XMMatrixRotationX(XMConvertToRadians(18));
 	view = XMMatrixMultiply(view, rotation_trix);
-	XMVECTOR determinant = XMMatrixDeterminant(view);
 	view = XMMatrixInverse(nullptr, view);
 	view = XMMatrixTranspose(view);
 	XMStoreFloat4x4(&m_view, view);
@@ -315,9 +331,26 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 	toShader_perspective.view = XMLoadFloat4x4(&m_view);	
 
 	XMMATRIX model = XMLoadFloat4x4(&m_CubeWorld);
-	model = XMMatrixTranslation(0, 0, -0.25f);
+	model = XMMatrixTranslation(0.7f, 0, 0);
 	toShader_perspective.model = XMMatrixTranspose(model);
 	XMStoreFloat4x4(&m_CubeWorld, model);
+
+// <mah hovercam>
+	aspect = HOVERCAM_WITDH / HOVERCAM_HEIGHT;
+	toshader_hoverCam.projection = XMMatrixTranspose(XMMatrixPerspectiveFovLH(XMConvertToRadians(90.0f), aspect, 0.1f, 1000.0f));
+
+	view = XMMatrixIdentity();
+	view = XMMatrixTranslation(0.0f, 1.5f, -1.7f);
+	XMFLOAT3 focus, up;
+	focus = XMFLOAT3(0, 0, 0);
+	up = XMFLOAT3(0.0f, 1.0f, 0.0f);
+	rotation_trix = XMMatrixLookAtLH(view.r[3], XMLoadFloat3(&focus), XMLoadFloat3(&up));
+	view = rotation_trix;
+	toshader_hoverCam.view = XMMatrixTranspose(view);
+	XMStoreFloat4x4(&m_hoverCam, view);
+	
+
+// <mah hovercam/>
 
 
 	iDevice->CreateVertexShader(&SampleVertexShader, sizeof(SampleVertexShader), NULL, &VertSha_perspective);
@@ -339,7 +372,7 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 
 // <mah 3D />
 
-	turn = 0.004f;
+	turn = 0.5f;
 	timeX.Throttle(60);
 
 }
@@ -403,23 +436,25 @@ bool DEMO_APP::Run()
 	iDeviceContext->IASetInputLayout(lay_perspective);
 	iDeviceContext->DrawIndexed(12, 0, 0);
 
+
 // <Mah 3d/>
 
 // <MultiViewport>
-	cbMirror_Perspective tempMirror;
-	tempMirror = toShader_perspective;
-	float aspect = BACKBUFFER_WIDTH / BACKBUFFER_HEIGHT;
-	tempMirror.projection = XMMatrixTranspose(XMMatrixPerspectiveFovLH(XMConvertToRadians(110.0f), aspect, 0.1f, 1000.0f));
+	XMMATRIX Hover = XMLoadFloat4x4(&m_hoverCam);
+	Hover = XMMatrixRotationY(XMConvertToRadians(turn * -3.2f)) * Hover;
+	XMStoreFloat4x4(&m_hoverCam, Hover);
+	toshader_hoverCam.model = XMMatrixTranspose(cubeWorld);
+	toshader_hoverCam.view = XMMatrixTranspose(Hover);
+
 	ZeroMemory(&map_cube, sizeof(D3D11_MAPPED_SUBRESOURCE));
 	iDeviceContext->Map(cBuff_perspective, 0, D3D11_MAP::D3D11_MAP_WRITE_DISCARD, NULL, &map_cube);
-	memcpy(map_cube.pData, &tempMirror, sizeof(tempMirror));
+	memcpy(map_cube.pData, &toshader_hoverCam, sizeof(toshader_hoverCam));
 	iDeviceContext->Unmap(cBuff_perspective, 0);
 	iDeviceContext->VSSetConstantBuffers(0, 1, &cBuff_perspective);
 
-	iDeviceContext->RSSetViewports(1, &tempView);
+	iDeviceContext->RSSetViewports(1, &hovCam_view);
 	iDeviceContext->DrawIndexed(12, 0, 0);
 // <MultiViewport/>
-
 
 	swapChain->Present(0, 0);
 
