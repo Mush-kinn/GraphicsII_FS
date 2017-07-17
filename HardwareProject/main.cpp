@@ -16,6 +16,7 @@
 #include <iostream>
 #include <ctime>
 #include "XTime.h"
+#include <vector>
 
 using namespace std;
 
@@ -120,10 +121,17 @@ public:
 		XMFLOAT3 pos;
 		XMFLOAT2 uv;
 	};
+
+	struct VERTEX_OBJMODEL{
+		XMFLOAT3 pos;
+		XMFLOAT3 uv;
+		XMFLOAT3 norm;
+	};
 	
 	DEMO_APP(HINSTANCE hinst, WNDPROC proc);
 	bool Run();
 	bool ShutDown();
+	bool LoadObjFile(string _filename, std::vector<VERTEX_OBJMODEL> &_forVB, std::vector<unsigned int> &_indx);
 };
 
 //************************************************************
@@ -485,6 +493,16 @@ bool DEMO_APP::ShutDown()
 	SampleState->Release();
 
 	UnregisterClass( L"DirectXApplication", application ); 
+	return true;
+}
+//#include "Assets\BasicPlatform\Wall.obj
+bool DEMO_APP::LoadObjFile(string _filename, std::vector<VERTEX_OBJMODEL> &_forVB, std::vector<unsigned int> &_indx){
+	std::vector<XMFLOAT3> vertexHold;
+	std::vector<XMFLOAT3> uvHold;
+	std::vector<XMFLOAT3> normalHold;
+	
+
+
 	return true;
 }
 
