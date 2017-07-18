@@ -246,7 +246,6 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 	iDevice->CreateRenderTargetView(iResource, NULL, &iRenderTarget);
 	iResource->Release(); 
 
-
 	swapChain->GetDesc(&chainDesc);
 	ZeroMemory(&viewPort, sizeof(D3D11_VIEWPORT));
 	viewPort.Height = static_cast<FLOAT>(chainDesc.BufferDesc.Height);
@@ -360,9 +359,7 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 	toshader_hoverCam.view = XMMatrixTranspose(view);
 	XMStoreFloat4x4(&m_hoverCam, view);
 	
-
 // <mah hovercam/>
-
 
 	iDevice->CreateVertexShader(&SampleVertexShader, sizeof(SampleVertexShader), NULL, &VertSha_perspective);
 	iDevice->CreatePixelShader(&SamplePixelShader, sizeof(SamplePixelShader), NULL, &PixSha_perspective);
@@ -400,13 +397,7 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 
 	iDevice->CreateBuffer(&vModel_desc, &vSub_Model, &vb_Platform);
 
-	D3D11_BUFFER_DESC iModel_desc;
-	ZeroMemory(&iModel_desc, sizeof(D3D11_BUFFER_DESC));
-	iModel_desc.Usage = D3D11_USAGE::D3D11_USAGE_DEFAULT;
-	iModel_desc.BindFlags = D3D11_BIND_FLAG::D3D11_BIND_INDEX_BUFFER;
-	iModel_desc.ByteWidth = sizeof(unsigned int) * vObjModel.size();
 
-	
 	std::vector<unsigned int> modelIndices;
 	unsigned int Fst, Mid, Trd;
 	for (unsigned int i = 0; i < vObjModel.size(); i+=4){
@@ -427,6 +418,13 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 		modelIndices.push_back(Trd);
 	}
 	ObjIndxCount = modelIndices.size();
+
+	D3D11_BUFFER_DESC iModel_desc;
+	ZeroMemory(&iModel_desc, sizeof(D3D11_BUFFER_DESC));
+	iModel_desc.Usage = D3D11_USAGE::D3D11_USAGE_DEFAULT;
+	iModel_desc.BindFlags = D3D11_BIND_FLAG::D3D11_BIND_INDEX_BUFFER;
+	iModel_desc.ByteWidth = sizeof(unsigned int) * ObjIndxCount;
+
 	ZeroMemory(&vSub_Model, sizeof(D3D11_SUBRESOURCE_DATA));
 	vSub_Model.pSysMem = modelIndices.data();
 
@@ -442,7 +440,7 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 
 // <Prototype Loader/>
 
-	turn = 0.5f;
+	turn = 12.0f;
 	timeX.Throttle(60);
 
 }
@@ -453,7 +451,6 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 
 bool DEMO_APP::Run()
 {
-
 	timeX.Signal();
 
 	iDeviceContext->OMSetRenderTargets(1, &iRenderTarget, NULL);
@@ -474,7 +471,7 @@ bool DEMO_APP::Run()
 
 // <Mah 3d>
 	XMMATRIX cubeWorld= XMLoadFloat4x4(&m_CubeWorld);
-	cubeWorld = XMMatrixRotationX(XMConvertToRadians(turn))*cubeWorld;
+	cubeWorld = XMMatrixRotationX(-XMConvertToRadians(turn*timeX.Delta()))*cubeWorld;
 	toShader_perspective.model = XMMatrixTranspose(cubeWorld);
 	XMStoreFloat4x4(&m_CubeWorld, cubeWorld);
 
@@ -533,7 +530,7 @@ bool DEMO_APP::Run()
 
 // <MultiViewport>
 	XMMATRIX Hover = XMLoadFloat4x4(&m_hoverCam);
-	Hover = XMMatrixRotationY(XMConvertToRadians(turn * -3.2f)) * Hover;
+	Hover = XMMatrixRotationY(XMConvertToRadians(turn*timeX.Delta() * -3.2f)) * Hover;
 	XMStoreFloat4x4(&m_hoverCam, Hover);
 	cubeWorld = XMLoadFloat4x4(&m_CubeWorld);
 	toshader_hoverCam.model = XMMatrixTranspose(cubeWorld);
@@ -599,7 +596,6 @@ bool DEMO_APP::LoadObjFile(const char *_filename, std::vector<VERTEX_OBJMODEL> &
 		printf("Connaot read this thing\n");
 		return false;
 	}
-	
 	for (;;){
 		char mahLine[70];
 		int result = fscanf(file, "%s", mahLine);
@@ -640,7 +636,6 @@ bool DEMO_APP::LoadObjFile(const char *_filename, std::vector<VERTEX_OBJMODEL> &
 			}
 		}
 	}
-
 	return true;
 }
 
