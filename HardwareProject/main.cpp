@@ -59,6 +59,7 @@ class DEMO_APP
 	XMFLOAT2 speed;
 	float turn;
 	XTime timeX;
+	unsigned int ObjIndxCount;
 
 	// Matrices
 	XMFLOAT4X4 m_view;
@@ -70,10 +71,12 @@ class DEMO_APP
 	ID3D11Buffer *vb_Cube;
 	ID3D11Buffer *ib_Cube;
 	ID3D11Buffer *cBuff_perspective;
+	ID3D11Buffer *vb_Platform;
+	ID3D11Buffer *ib_Platform;
 
-	
 	// Layouts
 	ID3D11InputLayout *lay_perspective;
+	ID3D11InputLayout *lay_OBJModel;
 
 	// Shaders
 	ID3D11VertexShader *VertSha_perspective;
@@ -131,7 +134,7 @@ public:
 	DEMO_APP(HINSTANCE hinst, WNDPROC proc);
 	bool Run();
 	bool ShutDown();
-	bool LoadObjFile(string _filename, std::vector<VERTEX_OBJMODEL> &_forVB, std::vector<unsigned int> &_indx);
+	bool LoadObjFile(const char *_filename, std::vector<VERTEX_OBJMODEL> &_forVB);
 };
 
 //************************************************************
@@ -380,6 +383,65 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 
 // <mah 3D />
 
+
+// <Prototype Loader>
+	std::vector<VERTEX_OBJMODEL> vObjModel;
+	LoadObjFile("Assets\\BasicPlatform\\wall.obj", vObjModel);
+
+	D3D11_BUFFER_DESC vModel_desc;
+	ZeroMemory(&vModel_desc, sizeof(D3D11_BUFFER_DESC));
+	vModel_desc.BindFlags = D3D11_BIND_FLAG::D3D11_BIND_VERTEX_BUFFER;
+	vModel_desc.Usage = D3D11_USAGE::D3D11_USAGE_IMMUTABLE;
+	vModel_desc.ByteWidth = sizeof(VERTEX_OBJMODEL)*vObjModel.size();
+
+	D3D11_SUBRESOURCE_DATA vSub_Model;
+	ZeroMemory(&vSub_Model, sizeof(D3D11_SUBRESOURCE_DATA));
+	vSub_Model.pSysMem = vObjModel.data();
+
+	iDevice->CreateBuffer(&vModel_desc, &vSub_Model, &vb_Platform);
+
+	D3D11_BUFFER_DESC iModel_desc;
+	ZeroMemory(&iModel_desc, sizeof(D3D11_BUFFER_DESC));
+	iModel_desc.Usage = D3D11_USAGE::D3D11_USAGE_DEFAULT;
+	iModel_desc.BindFlags = D3D11_BIND_FLAG::D3D11_BIND_INDEX_BUFFER;
+	iModel_desc.ByteWidth = sizeof(unsigned int) * vObjModel.size();
+
+	
+	std::vector<unsigned int> modelIndices;
+	unsigned int Fst, Mid, Trd;
+	for (unsigned int i = 0; i < vObjModel.size(); i+=4){
+		Fst = i;
+		Mid = i + 1;
+		Trd = i + 2;
+		
+		modelIndices.push_back(Fst);
+		modelIndices.push_back(Mid);
+		modelIndices.push_back(Trd);
+
+		Fst = Trd;
+		Mid = i + 3;
+		Trd = i;
+
+		modelIndices.push_back(Fst);
+		modelIndices.push_back(Mid);
+		modelIndices.push_back(Trd);
+	}
+	ObjIndxCount = modelIndices.size();
+	ZeroMemory(&vSub_Model, sizeof(D3D11_SUBRESOURCE_DATA));
+	vSub_Model.pSysMem = modelIndices.data();
+
+	iDevice->CreateBuffer(&iModel_desc, &vSub_Model, &ib_Platform);
+
+	D3D11_INPUT_ELEMENT_DESC layout_desc[3];
+
+	layout_desc[0] = { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 };
+	layout_desc[1] = { "TEXCOORD", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 };
+	layout_desc[2] = { "NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 };
+
+	iDevice->CreateInputLayout(layout_desc, 3, &SampleVertexShader, sizeof(SampleVertexShader), &lay_OBJModel);
+
+// <Prototype Loader/>
+
 	turn = 0.5f;
 	timeX.Throttle(60);
 
@@ -412,7 +474,7 @@ bool DEMO_APP::Run()
 
 // <Mah 3d>
 	XMMATRIX cubeWorld= XMLoadFloat4x4(&m_CubeWorld);
-	cubeWorld = XMMatrixRotationY(XMConvertToRadians(turn))*cubeWorld;
+	cubeWorld = XMMatrixRotationX(XMConvertToRadians(turn))*cubeWorld;
 	toShader_perspective.model = XMMatrixTranspose(cubeWorld);
 	XMStoreFloat4x4(&m_CubeWorld, cubeWorld);
 
@@ -447,10 +509,33 @@ bool DEMO_APP::Run()
 
 // <Mah 3d/>
 
+// <Model Loader>
+	cubeWorld = XMLoadFloat4x4(&m_CubeWorld);
+	cubeWorld = XMMatrixScaling(0.25f, 0.25f, 0.25f) * cubeWorld;
+	cubeWorld = cubeWorld * XMMatrixTranslation(-1.0, 0, 0);
+	toShader_perspective.model = XMMatrixTranspose(cubeWorld);
+
+	ZeroMemory(&map_cube, sizeof(D3D11_MAPPED_SUBRESOURCE));
+	iDeviceContext->Map(cBuff_perspective, 0, D3D11_MAP::D3D11_MAP_WRITE_DISCARD, NULL, &map_cube);
+	memcpy(map_cube.pData, &toShader_perspective, sizeof(toShader_perspective));
+	iDeviceContext->Unmap(cBuff_perspective, 0);
+	iDeviceContext->VSSetConstantBuffers(0, 1, &cBuff_perspective);
+
+	UINT strides = sizeof(VERTEX_OBJMODEL);
+	UINT offsets = 0;
+	iDeviceContext->IASetVertexBuffers(0, 1, &vb_Platform, &strides, &offsets);
+
+	iDeviceContext->IASetIndexBuffer(ib_Platform, DXGI_FORMAT_R32_UINT, 0);
+
+	iDeviceContext->IASetInputLayout(lay_OBJModel);
+	iDeviceContext->DrawIndexed(ObjIndxCount, 0, 0);
+// <Model loader/>
+
 // <MultiViewport>
 	XMMATRIX Hover = XMLoadFloat4x4(&m_hoverCam);
 	Hover = XMMatrixRotationY(XMConvertToRadians(turn * -3.2f)) * Hover;
 	XMStoreFloat4x4(&m_hoverCam, Hover);
+	cubeWorld = XMLoadFloat4x4(&m_CubeWorld);
 	toshader_hoverCam.model = XMMatrixTranspose(cubeWorld);
 	toshader_hoverCam.view = XMMatrixTranspose(Hover);
 
@@ -460,6 +545,9 @@ bool DEMO_APP::Run()
 	iDeviceContext->Unmap(cBuff_perspective, 0);
 	iDeviceContext->VSSetConstantBuffers(0, 1, &cBuff_perspective);
 
+	iDeviceContext->IASetVertexBuffers(0, 1, &vb_Cube, _strides, _offSets);
+	iDeviceContext->IASetIndexBuffer(ib_Cube, DXGI_FORMAT::DXGI_FORMAT_R32_UINT, 0);
+	iDeviceContext->IASetInputLayout(lay_perspective);
 	iDeviceContext->RSSetViewports(1, &hovCam_view);
 	iDeviceContext->DrawIndexed(12, 0, 0);
 // <MultiViewport/>
@@ -492,16 +580,66 @@ bool DEMO_APP::ShutDown()
 	tx_UVMap->Release();
 	SampleState->Release();
 
+	ib_Platform->Release();
+	vb_Platform->Release();
+	lay_OBJModel->Release();
+
 	UnregisterClass( L"DirectXApplication", application ); 
 	return true;
 }
 //#include "Assets\BasicPlatform\Wall.obj
-bool DEMO_APP::LoadObjFile(string _filename, std::vector<VERTEX_OBJMODEL> &_forVB, std::vector<unsigned int> &_indx){
+bool DEMO_APP::LoadObjFile(const char *_filename, std::vector<VERTEX_OBJMODEL> &_forVB){
 	std::vector<XMFLOAT3> vertexHold;
 	std::vector<XMFLOAT3> uvHold;
 	std::vector<XMFLOAT3> normalHold;
-	
+	std::vector<unsigned int> indx_Vector, indx_UVs, indx_Normal;
 
+	FILE *file = fopen( _filename, "r");
+	if (file == NULL){
+		printf("Connaot read this thing\n");
+		return false;
+	}
+	
+	for (;;){
+		char mahLine[70];
+		int result = fscanf(file, "%s", mahLine);
+		if (result == EOF){
+			break;
+		}
+		if (strcmp(mahLine, "v") == 0 ){
+			XMFLOAT3 temp;
+			fscanf(file, "%f %f %f\n", &temp.x, &temp.y, &temp.z);
+			vertexHold.push_back(temp);
+		}
+		else if (strcmp(mahLine, "vt") == 0){
+			XMFLOAT3 temp;
+			fscanf(file, "%f %f %f\n", &temp.x, &temp.y, &temp.z);
+			uvHold.push_back(temp);
+		}
+		else if (strcmp(mahLine, "vn") == 0){
+			XMFLOAT3 temp;
+			fscanf(file, "%f %f %f\n", &temp.x, &temp.y, &temp.z);
+			normalHold.push_back(temp);
+		}
+		else if (strcmp(mahLine, "f") == 0){
+			VERTEX_OBJMODEL temp;
+			unsigned int vert[4];
+			unsigned int UVs[4];
+			unsigned int normals[4];
+			int count = fscanf(file, "%d/%d/%d %d/%d/%d %d/%d/%d %d/%d/%d\n", &vert[0], &UVs[0], &normals[0], &vert[1], &UVs[1], &normals[1],
+				&vert[2], &UVs[2], &normals[2], &vert[3], &UVs[3], &normals[3]);
+			if (count != 12){
+				printf("Oops mistake were made");
+				return false;
+			}
+			for (unsigned int i = 0; i < 4; ++i){
+				temp.pos = vertexHold[vert[i] - 1];
+				temp.uv = uvHold[UVs[i] - 1];
+				temp.norm = normalHold[normals[i] - 1];
+				_forVB.push_back(temp);
+			}
+		}
+	}
 
 	return true;
 }
