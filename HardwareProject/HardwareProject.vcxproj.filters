@@ -37,12 +37,6 @@
     <FxCompile Include="SamplePixelShader.hlsl" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="Trivial_VS.csh">
-      <Filter>Source Files</Filter>
-    </None>
-    <None Include="Trivial_PS.csh">
-      <Filter>Source Files</Filter>
-    </None>
     <None Include="SamplePixelShader.csh">
       <Filter>Source Files</Filter>
     </None>
