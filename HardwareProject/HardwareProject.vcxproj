@@ -195,8 +195,6 @@
   <ItemGroup>
     <None Include="SamplePixelShader.csh" />
     <None Include="SampleVertexShader.csh" />
-    <None Include="Trivial_PS.csh" />
-    <None Include="Trivial_VS.csh" />
   </ItemGroup>
   <ItemGroup>
     <Image Include="Assets\Test_UV_Map.dds" />
