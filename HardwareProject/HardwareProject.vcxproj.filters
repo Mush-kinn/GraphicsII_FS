@@ -35,6 +35,9 @@
     <FxCompile Include="Trivial_VS.hlsl" />
     <FxCompile Include="SampleVertexShader.hlsl" />
     <FxCompile Include="SamplePixelShader.hlsl" />
+    <FxCompile Include="RTT_PixelShader.hlsl">
+      <Filter>Source Files</Filter>
+    </FxCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="SamplePixelShader.csh">

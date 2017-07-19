@@ -33,6 +33,8 @@ using namespace DirectX;
 #include "SampleVertexShader.csh"
 #include "SamplePixelShader.csh"
 
+#include "RTT_PixelShader.csh"
+
 #define BACKBUFFER_WIDTH	500
 #define BACKBUFFER_HEIGHT	500
 
@@ -83,6 +85,7 @@ class DEMO_APP
 	// Shaders
 	ID3D11VertexShader *VertSha_perspective;
 	ID3D11PixelShader *PixSha_perspective;
+	ID3D11PixelShader *PixSha_RTT;
 
 	// textures
 	ID3D11Texture2D *tx_UVMap;
@@ -93,7 +96,6 @@ class DEMO_APP
 	ID3D11ShaderResourceView *ShaderView;
 	ID3D11RenderTargetView *RTT_RenderTarget;
 	D3D11_VIEWPORT hovCam_view;
-	D3D11_VIEWPORT RTT_View;
 	ID3D11ShaderResourceView *RTT_ShaderView;
 
 	// Pending...
@@ -251,6 +253,7 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 	ZeroMemory(&iResource, sizeof(ID3D10Resource));
 	swapChain->GetBuffer(0, __uuidof(iResource), reinterpret_cast<void**>(&iResource));
 	iDevice->CreateRenderTargetView(iResource, NULL, &iRenderTarget);
+	iResource->Release(); 
 
 	swapChain->GetDesc(&chainDesc);
 	ZeroMemory(&viewPort, sizeof(D3D11_VIEWPORT));
@@ -258,10 +261,6 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 	viewPort.Width = static_cast<FLOAT>(chainDesc.BufferDesc.Width);
 	viewPort.MaxDepth = 1.0f;
 	viewPort.MinDepth = 0.0f;
-
-
-
-	iResource->Release(); 
 
 
 // <Mah hovercam>
@@ -379,9 +378,9 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 	XMStoreFloat4x4(&m_RTTProjection, projection);
 
 	view = XMMatrixIdentity();
-	view = XMMatrixTranslation(0.0f, 1.5f, -1.7f);
+	view = XMMatrixTranslation(0.0f, 0.0f, -1.5f);
 	rotation_trix = XMMatrixRotationX(XMConvertToRadians(18));
-	view = view * rotation_trix;
+	view = rotation_trix * view;
 	view = XMMatrixInverse(nullptr, view);
 	XMStoreFloat4x4(&m_RTTView, view);
 	toShader_RTT.view = XMMatrixTranspose(view);
@@ -391,7 +390,7 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 	D3D11_TEXTURE2D_DESC tempRTT_Desc;
 	ZeroMemory(&tempRTT_Desc, sizeof(D3D11_TEXTURE2D_DESC));
 	tempRTT_Desc.BindFlags = D3D11_BIND_FLAG::D3D11_BIND_RENDER_TARGET | D3D11_BIND_FLAG::D3D11_BIND_SHADER_RESOURCE;
-	tempRTT_Desc.Format = DXGI_FORMAT::DXGI_FORMAT_B8G8R8A8_UNORM_SRGB;
+	tempRTT_Desc.Format = DXGI_FORMAT::DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
 	tempRTT_Desc.MiscFlags = D3D11_RESOURCE_MISC_FLAG::D3D11_RESOURCE_MISC_GENERATE_MIPS;
 	tempRTT_Desc.ArraySize = 1;
 	tempRTT_Desc.Height = BACKBUFFER_HEIGHT;
@@ -403,7 +402,7 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 
 	D3D11_RENDER_TARGET_VIEW_DESC render_desc;
 	ZeroMemory(&render_desc, sizeof(render_desc));
-	render_desc.Format = DXGI_FORMAT::DXGI_FORMAT_B8G8R8A8_UNORM_SRGB;
+	render_desc.Format = DXGI_FORMAT::DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
 	render_desc.ViewDimension = D3D11_RTV_DIMENSION::D3D11_RTV_DIMENSION_TEXTURE2D;
 	render_desc.Texture2D.MipSlice = 0;
 
@@ -411,19 +410,14 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 
 	D3D11_SHADER_RESOURCE_VIEW_DESC RTTShaderview_desc;
 	ZeroMemory(&RTTShaderview_desc, sizeof(RTTShaderview_desc));
-	RTTShaderview_desc.Format = DXGI_FORMAT::DXGI_FORMAT_B8G8R8A8_UNORM_SRGB;
+	RTTShaderview_desc.Format = DXGI_FORMAT::DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
 	RTTShaderview_desc.ViewDimension = D3D11_SRV_DIMENSION::D3D11_SRV_DIMENSION_TEXTURE2D;
 	RTTShaderview_desc.Texture2D.MipLevels = 1;
 	RTTShaderview_desc.Texture2D.MostDetailedMip = 0;
 
 	iDevice->CreateShaderResourceView(tx_RTT, &RTTShaderview_desc, &RTT_ShaderView);
 
-	ZeroMemory(&RTT_View, sizeof(D3D11_VIEWPORT));
-	RTT_View.Height = static_cast<FLOAT>(chainDesc.BufferDesc.Height);
-	RTT_View.Width = static_cast<FLOAT>(chainDesc.BufferDesc.Width);
-	RTT_View.TopLeftX = RTT_View.Width + 1;
-	RTT_View.MaxDepth = 1.0f;
-	RTT_View.MinDepth = 0.0f;
+	iDevice->CreatePixelShader(&RTT_PixelShader, sizeof(RTT_PixelShader), NULL, &PixSha_RTT);
 
 	
 // <RTT/>
@@ -566,11 +560,11 @@ bool DEMO_APP::Run()
 // <Mah 3d/>
 
 // <RTT>
-	iDeviceContext->OMSetRenderTargets(1, &RTT_RenderTarget, NULL);
 	iDeviceContext->ClearRenderTargetView(RTT_RenderTarget, Black);
+	iDeviceContext->OMSetRenderTargets(1, &RTT_RenderTarget, NULL);
 	cubeWorld = XMLoadFloat4x4(&m_CubeWorld);
 	toShader_RTT.model = XMMatrixTranspose(cubeWorld);
-
+	
 	ZeroMemory(&map_cube, sizeof(D3D11_MAPPED_SUBRESOURCE));
 	iDeviceContext->Map(cBuff_perspective, 0, D3D11_MAP::D3D11_MAP_WRITE_DISCARD, NULL, &map_cube);
 	memcpy(map_cube.pData, &toShader_RTT, sizeof(toShader_RTT));
@@ -603,8 +597,15 @@ bool DEMO_APP::Run()
 	iDeviceContext->IASetIndexBuffer(ib_Platform, DXGI_FORMAT_R32_UINT, 0);
 
 	iDeviceContext->IASetInputLayout(lay_OBJModel);
+
+// <RTT>
+	iDeviceContext->PSSetShader(PixSha_RTT, 0, 0);
+
 	iDeviceContext->DrawIndexed(ObjIndxCount, 0, 0);
 // <Model loader/>
+
+	iDeviceContext->PSSetShader(PixSha_perspective,0,0);
+// <RTT/>
 
 
 // <MultiViewport>
@@ -664,6 +665,7 @@ bool DEMO_APP::ShutDown()
 	RTT_RenderTarget->Release();
 	RTT_ShaderView->Release();
 	tx_RTT->Release();
+	PixSha_RTT->Release();
 
 	UnregisterClass( L"DirectXApplication", application ); 
 	return true;
