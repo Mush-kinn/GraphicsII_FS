@@ -402,7 +402,6 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 	iDevice->CreateTexture2D(&tempRTT_Desc, NULL, &tx_RTT);
 
 	D3D11_RENDER_TARGET_VIEW_DESC render_desc;
-	ZeroMemory(&render_desc, sizeof(render_desc));
 	render_desc.Format = DXGI_FORMAT::DXGI_FORMAT_B8G8R8A8_UNORM_SRGB;
 	render_desc.ViewDimension = D3D11_RTV_DIMENSION::D3D11_RTV_DIMENSION_TEXTURE2D;
 	render_desc.Texture2D.MipSlice = 0;
@@ -410,10 +409,9 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 	iDevice->CreateRenderTargetView(tx_RTT, &render_desc, &RTT_RenderTarget);
 
 	D3D11_SHADER_RESOURCE_VIEW_DESC RTTShaderview_desc;
-	ZeroMemory(&RTTShaderview_desc, sizeof(RTTShaderview_desc));
 	RTTShaderview_desc.Format = DXGI_FORMAT::DXGI_FORMAT_B8G8R8A8_UNORM_SRGB;
 	RTTShaderview_desc.ViewDimension = D3D11_SRV_DIMENSION::D3D11_SRV_DIMENSION_TEXTURE2D;
-	RTTShaderview_desc.Texture2D.MipLevels = 1;
+	RTTShaderview_desc.Texture2D.MipLevels = -1;
 	RTTShaderview_desc.Texture2D.MostDetailedMip = 0;
 
 	iDevice->CreateShaderResourceView(tx_RTT, &RTTShaderview_desc, &RTT_ShaderView);
@@ -578,8 +576,8 @@ bool DEMO_APP::Run()
 	iDeviceContext->VSSetConstantBuffers(0, 1, &cBuff_perspective);
 
 	iDeviceContext->DrawIndexed(12, 0, 0);
-
 	iDeviceContext->OMSetRenderTargets(1, &iRenderTarget, NULL);
+
 	iDeviceContext->PSSetShaderResources(0, 1, &RTT_ShaderView);
 
 // <RTT/>
@@ -608,7 +606,6 @@ bool DEMO_APP::Run()
 
 
 // <MultiViewport>
-	iDeviceContext->PSSetShaderResources(0, 1, &ShaderView);
 	XMMATRIX Hover = XMLoadFloat4x4(&m_hoverCam);
 	Hover = XMMatrixRotationY(XMConvertToRadians(turn*timeX.Delta() * -3.2f)) * Hover;
 	XMStoreFloat4x4(&m_hoverCam, Hover);
