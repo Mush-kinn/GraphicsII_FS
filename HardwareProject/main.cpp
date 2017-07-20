@@ -25,7 +25,7 @@ using namespace std;
 #include <DirectXMath.h>
 using namespace DirectX;
 #include "Assets\Test_UV_Map.h"
-
+#include "AlphaDefines.h"
 
 #include "Trivial_PS.csh"
 #include "Trivial_VS.csh"
@@ -48,6 +48,10 @@ using namespace DirectX;
 
 #pragma endregion
 
+#ifndef VK_A
+#define VK_A 0x41
+#endif
+
 //************************************************************
 //************ SIMPLE WINDOWS APP CLASS **********************
 //************************************************************
@@ -62,6 +66,9 @@ class DEMO_APP
 	float turn;
 	XTime timeX;
 	unsigned int ObjIndxCount;
+	static bool mahKeys[256];
+	static std::vector<UINT> KeyStateON;
+	static std::vector<UINT> KeyStateOFF;
 
 	// Matrices
 	XMFLOAT4X4 m_view;
@@ -141,10 +148,35 @@ public:
 	};
 	
 	DEMO_APP(HINSTANCE hinst, WNDPROC proc);
+	static void UpdateKeyboardInput(UINT _key, bool _state);
+	void UpdateInput();
 	bool Run();
 	bool ShutDown();
 	bool LoadObjFile(const char *_filename, std::vector<VERTEX_OBJMODEL> &_forVB);
 };
+
+std::vector<UINT> DEMO_APP::KeyStateON;
+std::vector<UINT> DEMO_APP::KeyStateOFF;
+bool DEMO_APP::mahKeys[256] = {};
+
+void DEMO_APP::UpdateKeyboardInput(UINT _key, bool _state){
+	if (_state)
+		KeyStateON.push_back(_key);
+	else
+		KeyStateOFF.push_back(_key);
+}
+
+void DEMO_APP::UpdateInput(){
+	while (!KeyStateON.empty())
+	{
+		mahKeys[KeyStateON.back()] = true;
+		KeyStateON.pop_back();
+	}
+	while (!KeyStateOFF.empty()){
+		mahKeys[KeyStateOFF.back()] = false;
+		KeyStateOFF.pop_back();
+	}
+}
 
 //************************************************************
 //************ CREATION OF OBJECTS & RESOURCES ***************
@@ -502,7 +534,7 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 // <Prototype Loader/>
 
 	turn = 12.0f;
-	timeX.Throttle(60);
+	timeX.Throttle(2);
 
 }
 
@@ -512,15 +544,28 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 
 bool DEMO_APP::Run()
 {
+	UpdateInput();
 	timeX.Signal();
 
 	iDeviceContext->OMSetRenderTargets(1, &iRenderTarget, NULL);
 
 	FLOAT DarkBlue[] = { 0.0f, 0.0f, 0.45f, 1.0f };
 	FLOAT Black[] = { 0.0f, 0.0f, 0.0f, 1.0f };
+	FLOAT RED[] = { 1.0f, 0.0f, 0.0f, 1.0f };
+	FLOAT GREEN[] = { 0.0f, 1.0f, 0.0f, 1.0f };
+	FLOAT BLUE[] = { 0.0f, 0.0f, 1.0f, 1.0f };
 
 	iDeviceContext->RSSetViewports(1, &viewPort);
-	iDeviceContext->ClearRenderTargetView(iRenderTarget, DarkBlue);
+	if (mahKeys[VK_W])
+		iDeviceContext->ClearRenderTargetView(iRenderTarget, GREEN);
+	else if (mahKeys[VK_S])
+		iDeviceContext->ClearRenderTargetView(iRenderTarget, RED);
+	else if (mahKeys[VK_A])
+		iDeviceContext->ClearRenderTargetView(iRenderTarget, Black);
+	else if (mahKeys[VK_D])
+		iDeviceContext->ClearRenderTargetView(iRenderTarget, BLUE);
+	else
+		iDeviceContext->ClearRenderTargetView(iRenderTarget, DarkBlue);
 
 // <Mah 3d>
 	XMMATRIX cubeWorld= XMLoadFloat4x4(&m_CubeWorld);
@@ -758,6 +803,34 @@ LRESULT CALLBACK WndProc( HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam 
     {
         case ( WM_DESTROY ): { PostQuitMessage( 0 ); }
         break;
+		case (WM_KEYDOWN) : 
+			//if (wParam == VK_A)
+			//	DEMO_APP::UpdateKeyboardInput(VK_A, true);
+			switch (wParam)
+			{
+			case VK_A: DEMO_APP::UpdateKeyboardInput(VK_A, true); break;
+			case VK_W: DEMO_APP::UpdateKeyboardInput(VK_W, true); break;
+			case VK_S: DEMO_APP::UpdateKeyboardInput(VK_S, true); break;
+			case VK_D: DEMO_APP::UpdateKeyboardInput(VK_D, true); break;
+			default:
+				break;
+			}
+			break;
+
+		case (WM_KEYUP):
+			//if (wParam == VK_A)
+			//	DEMO_APP::UpdateKeyboardInput(VK_A, false);
+			switch (wParam)
+			{
+			case VK_A: DEMO_APP::UpdateKeyboardInput(VK_A, false); break;
+			case VK_W: DEMO_APP::UpdateKeyboardInput(VK_W, false); break;
+			case VK_S: DEMO_APP::UpdateKeyboardInput(VK_S, false); break;
+			case VK_D: DEMO_APP::UpdateKeyboardInput(VK_D, false); break;
+			default:
+				break;
+			}
+			break;
+
     }
     return DefWindowProc( hWnd, message, wParam, lParam );
 }

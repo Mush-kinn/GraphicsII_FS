@@ -163,6 +163,7 @@
     <ClCompile Include="XTime.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="AlphaDefines.h" />
     <ClInclude Include="Assets\Test_UV_Map.h" />
     <ClInclude Include="XTime.h" />
   </ItemGroup>
