@@ -52,6 +52,9 @@ using namespace DirectX;
 #define VK_A 0x41
 #endif
 
+enum MouseBehave{ MIA, IDLE, MOVING };
+enum MouseStatus{ LOCKED, FREE };
+
 //************************************************************
 //************ SIMPLE WINDOWS APP CLASS **********************
 //************************************************************
@@ -69,6 +72,7 @@ class DEMO_APP
 	static bool mahKeys[256];
 	static std::vector<UINT> KeyStateON;
 	static std::vector<UINT> KeyStateOFF;
+	MouseStatus MStatus = MouseStatus::FREE;
 
 	// Matrices
 	XMFLOAT4X4 m_view;
@@ -148,7 +152,7 @@ public:
 	};
 	
 	DEMO_APP(HINSTANCE hinst, WNDPROC proc);
-	static void UpdateKeyboardInput(UINT _key, bool _state);
+	static void UpdateKeyboardInput(UINT _key, bool _state, bool _toggle= false);
 	void UpdateInput();
 	bool Run();
 	bool ShutDown();
@@ -159,11 +163,19 @@ std::vector<UINT> DEMO_APP::KeyStateON;
 std::vector<UINT> DEMO_APP::KeyStateOFF;
 bool DEMO_APP::mahKeys[256] = {};
 
-void DEMO_APP::UpdateKeyboardInput(UINT _key, bool _state){
-	if (_state)
-		KeyStateON.push_back(_key);
-	else
-		KeyStateOFF.push_back(_key);
+void DEMO_APP::UpdateKeyboardInput(UINT _key, bool _state, bool _toggle){
+	if (_state && _toggle){
+		return;
+	}
+	if (!_toggle){
+		if (_state)
+			KeyStateON.push_back(_key);
+		else
+			KeyStateOFF.push_back(_key);
+	}
+	else{
+		mahKeys[_key] ? KeyStateOFF.push_back(_key) : KeyStateON.push_back(_key);
+	}
 }
 
 void DEMO_APP::UpdateInput(){
@@ -547,6 +559,15 @@ bool DEMO_APP::Run()
 	UpdateInput();
 	timeX.Signal();
 
+	if (MStatus == MouseStatus::FREE && mahKeys[VK_CONTROL]){
+		ShowCursor(false);
+		MStatus = MouseStatus::LOCKED;
+	}
+	if (MStatus == MouseStatus::LOCKED && !mahKeys[VK_CONTROL]){
+		ShowCursor(true);
+		MStatus = MouseStatus::FREE;
+	}
+
 	iDeviceContext->OMSetRenderTargets(1, &iRenderTarget, NULL);
 
 	FLOAT DarkBlue[] = { 0.0f, 0.0f, 0.45f, 1.0f };
@@ -812,6 +833,8 @@ LRESULT CALLBACK WndProc( HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam 
 			case VK_W: DEMO_APP::UpdateKeyboardInput(VK_W, true); break;
 			case VK_S: DEMO_APP::UpdateKeyboardInput(VK_S, true); break;
 			case VK_D: DEMO_APP::UpdateKeyboardInput(VK_D, true); break;
+			case VK_CONTROL : DEMO_APP::UpdateKeyboardInput(VK_CONTROL, true, true); break;
+				
 			default:
 				break;
 			}
@@ -826,10 +849,11 @@ LRESULT CALLBACK WndProc( HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam 
 			case VK_W: DEMO_APP::UpdateKeyboardInput(VK_W, false); break;
 			case VK_S: DEMO_APP::UpdateKeyboardInput(VK_S, false); break;
 			case VK_D: DEMO_APP::UpdateKeyboardInput(VK_D, false); break;
+			case VK_CONTROL: DEMO_APP::UpdateKeyboardInput(VK_CONTROL, false, true); break;
+
 			default:
 				break;
 			}
-			break;
 
     }
     return DefWindowProc( hWnd, message, wParam, lParam );
