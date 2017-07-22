@@ -17,6 +17,7 @@
 #include <ctime>
 #include "XTime.h"
 #include <vector>
+#include <thread>
 
 using namespace std;
 
@@ -55,6 +56,9 @@ using namespace DirectX;
 enum MouseBehave{ MIA, IDLE, MOVING };
 enum MouseStatus{ LOCKED, FREE };
 
+enum ShadersSettings{ DEFAULT, CUSTOM, PREVIOUS, TEMP};
+enum ShaderType{ Pixel, Vertex, Geo};
+
 //************************************************************
 //************ SIMPLE WINDOWS APP CLASS **********************
 //************************************************************
@@ -65,7 +69,7 @@ class DEMO_APP
 	WNDPROC							appWndProc;
 	HWND							window;
 
-	XMFLOAT2 speed;
+	float speed = 4;
 	float turn;
 	XTime timeX;
 	unsigned int ObjIndxCount;
@@ -81,6 +85,10 @@ class DEMO_APP
 	XMFLOAT4X4 m_hoverCam;
 	XMFLOAT4X4 m_RTTView;
 	XMFLOAT4X4 m_RTTProjection;
+
+
+	XMFLOAT4X4 CamMovement;
+	XMFLOAT3 newCamOffset;
 
 	// Buffers
 	ID3D11Buffer *vb_Cube;
@@ -188,6 +196,22 @@ void DEMO_APP::UpdateInput(){
 		mahKeys[KeyStateOFF.back()] = false;
 		KeyStateOFF.pop_back();
 	}
+
+	if (mahKeys[VK_A])
+		newCamOffset.x += speed * timeX.SmoothDelta();
+	if (mahKeys[VK_D])
+		newCamOffset.x -= speed * timeX.SmoothDelta();
+	if (mahKeys[VK_W])
+		newCamOffset.z -= speed * timeX.SmoothDelta();
+	if (mahKeys[VK_S])
+		newCamOffset.z += speed * timeX.SmoothDelta();
+
+	XMMATRIX temp;// = XMLoadFloat4x4(&CamMovement);
+	temp = XMMatrixIdentity();
+	temp = temp * XMMatrixTranslation(newCamOffset.x, newCamOffset.y, newCamOffset.z);
+	XMStoreFloat4x4(&CamMovement, temp);
+	ZeroMemory(&newCamOffset, sizeof(newCamOffset));
+
 }
 
 //************************************************************
@@ -257,11 +281,12 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 	sampler_desc.AddressV = D3D11_TEXTURE_ADDRESS_WRAP;
 	sampler_desc.AddressW = D3D11_TEXTURE_ADDRESS_WRAP;
 	sampler_desc.MinLOD = 0;
-	sampler_desc.MaxLOD = Test_UV_Map_numlevels;
+	sampler_desc.MaxLOD = 1;
 	sampler_desc.ComparisonFunc = D3D11_COMPARISON_FUNC::D3D11_COMPARISON_GREATER_EQUAL;
 	
 	iDevice->CreateSamplerState(&sampler_desc, &SampleState);
 	
+#pragma region Load
 	D3D11_TEXTURE2D_DESC tx_UV_Desc;
 	ZeroMemory(&tx_UV_Desc, sizeof(D3D11_TEXTURE2D_DESC));
 	tx_UV_Desc.Usage = D3D11_USAGE::D3D11_USAGE_IMMUTABLE;
@@ -292,6 +317,7 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 	Shaderview_desc.Texture2DArray.MostDetailedMip = 0;
 
 	iDevice->CreateShaderResourceView(tx_UVMap, &Shaderview_desc, &ShaderView);
+#pragma endregion
 
 	ID3D11Resource *iResource;
 	ZeroMemory(&iResource, sizeof(ID3D10Resource));
@@ -306,6 +332,7 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 	viewPort.MaxDepth = 1.0f;
 	viewPort.MinDepth = 0.0f;
 
+#pragma region extraView
 
 // <Mah hovercam>
 	ZeroMemory(&hovCam_view, sizeof(hovCam_view));
@@ -318,7 +345,11 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 
 // <mah hovercam/>
 
+#pragma endregion
+
 // <Mah 3D>
+
+#pragma region DefaultShape
 	unsigned int indx = 0;
 
 	VERTEX_3D aTri[4] = { 
@@ -370,7 +401,9 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 	iDevice->CreateBuffer(&indx_Cube_desc, &indx_subRes_cube, &ib_Cube);
 
 	XMStoreFloat4x4(&m_CubeWorld,XMMatrixIdentity());
+#pragma endregion
 
+#pragma region DefaultViewProjection
 	m_view = XMFLOAT4X4(
 		1.0f, 0.0f, 0.0f, 0.0f,
 		0.0f, 1.0f, 0.0f, 0.0f,
@@ -394,11 +427,14 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 
 	toShader_perspective.view = XMLoadFloat4x4(&m_view);	
 
+#pragma endregion
+
 	XMMATRIX model = XMLoadFloat4x4(&m_CubeWorld);
 	model = XMMatrixTranslation(0.7f, 0, 0);
 	toShader_perspective.model = XMMatrixTranspose(model);
-	XMStoreFloat4x4(&m_CubeWorld, model);
+	XMStoreFloat4x4(&m_CubeWorld, model); 
 
+#pragma region extraView
 // <mah hovercam>
 	aspect = HOVERCAM_WITDH / HOVERCAM_HEIGHT;
 	toshader_hoverCam.projection = XMMatrixTranspose(XMMatrixPerspectiveFovLH(XMConvertToRadians(90.0f), aspect, 0.1f, 1000.0f));
@@ -414,7 +450,9 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 	XMStoreFloat4x4(&m_hoverCam, view);
 	
 // <mah hovercam/>
+#pragma endregion
 
+#pragma region RTTview
 // <RTT>
 	aspect = BACKBUFFER_WIDTH / BACKBUFFER_HEIGHT;
 	XMMATRIX projection = XMMatrixPerspectiveFovLH(XMConvertToDegrees(90.0f), aspect, 0.1f, 1000.0f);
@@ -465,7 +503,9 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 
 	
 // <RTT/>
+#pragma endregion
 
+#pragma region Default
 	iDevice->CreateVertexShader(&SampleVertexShader, sizeof(SampleVertexShader), NULL, &VertSha_perspective);
 	iDevice->CreatePixelShader(&SamplePixelShader, sizeof(SamplePixelShader), NULL, &PixSha_perspective);
 
@@ -484,8 +524,10 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 	iDevice->CreateBuffer(&cb_3d, NULL, &cBuff_perspective);
 
 // <mah 3D />
+#pragma endregion
 
 
+#pragma region Load
 // <Prototype Loader>
 	std::vector<VERTEX_OBJMODEL> vObjModel;
 	LoadObjFile("Assets\\BasicPlatform\\wall.obj", vObjModel);
@@ -544,9 +586,11 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 	iDevice->CreateInputLayout(layout_desc, 3, &SampleVertexShader, sizeof(SampleVertexShader), &lay_OBJModel);
 
 // <Prototype Loader/>
+#pragma endregion
 
 	turn = 12.0f;
 	timeX.Throttle(2);
+	ZeroMemory(&newCamOffset, sizeof(newCamOffset));
 
 }
 
@@ -556,8 +600,8 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 
 bool DEMO_APP::Run()
 {
-	UpdateInput();
 	timeX.Signal();
+	UpdateInput();
 
 	if (MStatus == MouseStatus::FREE && mahKeys[VK_CONTROL]){
 		ShowCursor(false);
@@ -593,6 +637,8 @@ bool DEMO_APP::Run()
 	cubeWorld = XMMatrixRotationX(-XMConvertToRadians(turn*timeX.Delta()))*cubeWorld;
 	toShader_perspective.model = XMMatrixTranspose(cubeWorld);
 	XMStoreFloat4x4(&m_CubeWorld, cubeWorld);
+
+	toShader_perspective.view = XMMatrixTranspose(XMLoadFloat4x4(&CamMovement)) * toShader_perspective.view ;
 
 	D3D11_MAPPED_SUBRESOURCE map_cube;
 	ZeroMemory(&map_cube, sizeof(D3D11_MAPPED_SUBRESOURCE));
@@ -695,7 +741,6 @@ bool DEMO_APP::Run()
 	iDeviceContext->RSSetViewports(1, &hovCam_view);
 	iDeviceContext->DrawIndexed(12, 0, 0);
 // <MultiViewport/>
-
 	swapChain->Present(0, 0);
 
 	return true; 
@@ -816,6 +861,9 @@ int WINAPI wWinMain( HINSTANCE hInstance, HINSTANCE, LPTSTR, int )
 	myApp.ShutDown(); 
 	return 0; 
 }
+
+// ********************************************************************* \\
+   *********************************************************************
 LRESULT CALLBACK WndProc( HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam )
 {
     if(GetAsyncKeyState(VK_ESCAPE))
