@@ -76,8 +76,12 @@ class DEMO_APP
 	XMFLOAT4X4 m_RTTProjection;
 
 	XMFLOAT4X4 Spinny;
-	XMFLOAT4X4 CamMovement;
+
+	// Vectors
 	XMFLOAT3 newCamOffset;
+	XMFLOAT3 Tracker_Up;
+	XMFLOAT3 Tracker_Pos;
+	XMFLOAT3 Tracker_Tgt;
 
 	// Buffers
 	ID3D11Buffer *vb_Cube;
@@ -187,6 +191,7 @@ void DEMO_APP::UpdateInput(){
 		mahKeys[KeyStateOFF.back()] = false;
 		KeyStateOFF.pop_back();
 	}
+
 	float sDelt = (float)timeX.SmoothDelta();
 	if (mahKeys[VK_A])
 		newCamOffset.x -= speed * sDelt;
@@ -197,33 +202,48 @@ void DEMO_APP::UpdateInput(){
 	if (mahKeys[VK_S])
 		newCamOffset.z -= speed * sDelt;
 
-	XMMATRIX temp, INverted;
-	XMVECTOR Scale, Rot, Trans;
-	temp = XMMatrixIdentity();
-	
-	if (mahKeys[VK_NUMPAD4])
-		temp = XMMatrixRotationY(XMConvertToRadians(-80 * sDelt)) *temp ;
-	if (mahKeys[VK_NUMPAD6])
-		temp = XMMatrixRotationY(XMConvertToRadians(80 * sDelt)) *temp ;
+		XMMATRIX temp, INverted;
+		XMVECTOR Scale, Rot, Trans;
 
-	INverted = XMMatrixInverse(NULL, XMLoadFloat4x4(&m_view));
-	XMMatrixDecompose(&Scale, &Rot, &Trans, INverted);
-	temp = XMMatrixScalingFromVector(Scale) * XMMatrixRotationQuaternion(Rot) * temp;
-	temp = temp * XMMatrixTranslationFromVector(Trans);
+	if (!mahKeys[VK_T]){
+		temp = XMMatrixIdentity();
 
-	if (mahKeys[VK_NUMPAD8])
-		temp =  XMMatrixRotationX(XMConvertToRadians(-80 * sDelt)) * temp ;
-	if (mahKeys[VK_NUMPAD2])
-		temp = XMMatrixRotationX(XMConvertToRadians(80 * sDelt)) * temp;
+		if (mahKeys[VK_NUMPAD4])
+			temp = XMMatrixRotationY(XMConvertToRadians(-80 * sDelt)) *temp;
+		if (mahKeys[VK_NUMPAD6])
+			temp = XMMatrixRotationY(XMConvertToRadians(80 * sDelt)) *temp;
 
-	XMFLOAT4 MAX(1,1,1,1), MIN(-1,0,-1,0);
-	temp.r[1] = XMVectorClamp(temp.r[1], XMLoadFloat4(&MIN), XMLoadFloat4(&MAX));
-	XMStoreFloat4x4(&Spinny, temp);
+		INverted = XMMatrixInverse(NULL, XMLoadFloat4x4(&m_view));
+		XMMatrixDecompose(&Scale, &Rot, &Trans, INverted);
+		temp = XMMatrixScalingFromVector(Scale) * XMMatrixRotationQuaternion(Rot) * temp;
+		temp = temp * XMMatrixTranslationFromVector(Trans);
 
-	temp = XMMatrixIdentity();
-	temp = temp * XMMatrixTranslation(newCamOffset.x, newCamOffset.y, newCamOffset.z);
-	temp =  temp * XMLoadFloat4x4(&Spinny);
-	XMStoreFloat4x4(&m_view, XMMatrixInverse(NULL, temp));
+		if (mahKeys[VK_NUMPAD8])
+			temp = XMMatrixRotationX(XMConvertToRadians(-80 * sDelt)) * temp;
+		if (mahKeys[VK_NUMPAD2])
+			temp = XMMatrixRotationX(XMConvertToRadians(80 * sDelt)) * temp;
+
+		XMFLOAT4 MAX(1, 1, 1, 1), MIN(-1, 0, -1, 0);
+		temp.r[1] = XMVectorClamp(temp.r[1], XMLoadFloat4(&MIN), XMLoadFloat4(&MAX));
+		XMStoreFloat4x4(&Spinny, temp);
+
+		temp = XMMatrixIdentity();
+		temp = temp * XMMatrixTranslation(newCamOffset.x, newCamOffset.y, newCamOffset.z);
+		temp = temp * XMLoadFloat4x4(&Spinny);
+		XMStoreFloat4x4(&m_view, XMMatrixInverse(NULL, temp));
+	}
+	else{
+		XMMATRIX temp = XMMatrixIdentity();
+		INverted = XMMatrixInverse(NULL, XMLoadFloat4x4(&m_view));
+		XMMatrixDecompose(&Scale, &Rot, &Trans, INverted);
+		XMVECTOR aVector = Trans;
+		XMMatrixDecompose(&Scale, &Rot, &Trans, XMLoadFloat4x4(& m_CubeWorld));
+		XMStoreFloat3(&Tracker_Tgt, Trans);
+		temp = XMMatrixLookAtLH(aVector, XMLoadFloat3(&Tracker_Tgt), XMLoadFloat3(&Tracker_Up));
+		temp = temp * XMMatrixInverse(NULL, XMMatrixTranslation(newCamOffset.x, newCamOffset.y, newCamOffset.z));
+		XMStoreFloat4x4(&m_view, temp);
+	}
+
 	ZeroMemory(&newCamOffset, sizeof(newCamOffset));
 
 	if (MStatus == MouseStatus::FREE && mahKeys[VK_CONTROL]){
@@ -446,6 +466,11 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 #pragma endregion
 
 #pragma region DefaultViewProjection
+
+	Tracker_Up = XMFLOAT3(0, 1, 0);
+	Tracker_Pos = XMFLOAT3(0, 0, 0);
+	Tracker_Tgt = XMFLOAT3(0, 0, 1);
+
 	m_view = XMFLOAT4X4(
 		1.0f, 0.0f, 0.0f, 0.0f,
 		0.0f, 1.0f, 0.0f, 0.0f,
@@ -910,7 +935,8 @@ LRESULT CALLBACK WndProc( HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam 
 				case VK_W: DEMO_APP::UpdateKeyboardInput(VK_W, true); break;
 				case VK_S: DEMO_APP::UpdateKeyboardInput(VK_S, true); break;
 				case VK_D: DEMO_APP::UpdateKeyboardInput(VK_D, true); break;
-				case VK_CONTROL : DEMO_APP::UpdateKeyboardInput(VK_CONTROL, true, true); break;
+				case VK_T: DEMO_APP::UpdateKeyboardInput(VK_T, true, true); break;
+				case VK_CONTROL: DEMO_APP::UpdateKeyboardInput(VK_CONTROL, true, true); break;
 				case VK_NUMPAD2: DEMO_APP::UpdateKeyboardInput(VK_NUMPAD2, true); break;
 				case VK_NUMPAD4: DEMO_APP::UpdateKeyboardInput(VK_NUMPAD4, true); break;
 				case VK_NUMPAD6: DEMO_APP::UpdateKeyboardInput(VK_NUMPAD6, true); break;
@@ -926,6 +952,7 @@ LRESULT CALLBACK WndProc( HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam 
 				case VK_W: DEMO_APP::UpdateKeyboardInput(VK_W, false); break;
 				case VK_S: DEMO_APP::UpdateKeyboardInput(VK_S, false); break;
 				case VK_D: DEMO_APP::UpdateKeyboardInput(VK_D, false); break;
+				case VK_T: DEMO_APP::UpdateKeyboardInput(VK_T, false, true); break;
 				case VK_CONTROL: DEMO_APP::UpdateKeyboardInput(VK_CONTROL, false, true); break;
 				case VK_NUMPAD2: DEMO_APP::UpdateKeyboardInput(VK_NUMPAD2, false); break;
 				case VK_NUMPAD4: DEMO_APP::UpdateKeyboardInput(VK_NUMPAD4, false); break;

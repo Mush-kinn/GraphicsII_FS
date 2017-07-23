@@ -44,8 +44,10 @@
 #ifndef VK_S
 #define VK_S 0x53
 #endif
-//0x54
-//T key
+
+#ifndef VK_T
+#define VK_T 0x54
+#endif
 //0x55
 //U key
 //0x56
