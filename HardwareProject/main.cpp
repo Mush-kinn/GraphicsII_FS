@@ -1,14 +1,3 @@
-// CGS HW Project A "Line Land".
-// Author: L.Norri CD CGS, FullSail University
-
-// Introduction:
-// Welcome to the hardware project of the Computer Graphics Systems class.
-// This assignment is fully guided but still requires significant effort on your part. 
-// Future classes will demand the habits & foundation you develop right now!  
-// It is CRITICAL that you follow each and every step. ESPECIALLY THE READING!!!
-
-// TO BEGIN: Open the word document that acompanies this project and start from the top.
-
 //************************************************************
 //************ INCLUDES & DEFINES ****************************
 //************************************************************
@@ -109,6 +98,7 @@ class DEMO_APP
 	// textures
 	ID3D11Texture2D *tx_UVMap;
 	ID3D11Texture2D *tx_RTT;
+	ID3D11Texture2D *tx_DepthStencil;
 
 	// Views
 	ID3D11RenderTargetView *iRenderTarget;
@@ -116,6 +106,7 @@ class DEMO_APP
 	ID3D11RenderTargetView *RTT_RenderTarget;
 	D3D11_VIEWPORT hovCam_view;
 	ID3D11ShaderResourceView *RTT_ShaderView;
+	ID3D11DepthStencilView *iDepthStencilView;
 
 	// Pending...
 	ID3D11SamplerState *SampleState;
@@ -196,35 +187,43 @@ void DEMO_APP::UpdateInput(){
 		mahKeys[KeyStateOFF.back()] = false;
 		KeyStateOFF.pop_back();
 	}
-
+	float sDelt = (float)timeX.SmoothDelta();
 	if (mahKeys[VK_A])
-		newCamOffset.x += speed * timeX.SmoothDelta();
+		newCamOffset.x -= speed * sDelt;
 	if (mahKeys[VK_D])
-		newCamOffset.x -= speed * timeX.SmoothDelta();
+		newCamOffset.x += speed * sDelt;
 	if (mahKeys[VK_W])
-		newCamOffset.z -= speed * timeX.SmoothDelta();
+		newCamOffset.z += speed * sDelt;
 	if (mahKeys[VK_S])
-		newCamOffset.z += speed * timeX.SmoothDelta();
+		newCamOffset.z -= speed * sDelt;
 
-	XMMATRIX temp;
+	XMMATRIX temp, INverted;
+	XMVECTOR Scale, Rot, Trans;
 	temp = XMMatrixIdentity();
-
+	
 	if (mahKeys[VK_NUMPAD4])
-		temp = XMMatrixRotationY(XMConvertToRadians(80 * timeX.SmoothDelta())) * temp;
+		temp = XMMatrixRotationY(XMConvertToRadians(-80 * sDelt)) *temp ;
 	if (mahKeys[VK_NUMPAD6])
-		temp = XMMatrixRotationY(XMConvertToRadians(-80 * timeX.SmoothDelta() )) * temp;
+		temp = XMMatrixRotationY(XMConvertToRadians(80 * sDelt)) *temp ;
+
+	INverted = XMMatrixInverse(NULL, XMLoadFloat4x4(&m_view));
+	XMMatrixDecompose(&Scale, &Rot, &Trans, INverted);
+	temp = XMMatrixScalingFromVector(Scale) * XMMatrixRotationQuaternion(Rot) * temp;
+	temp = temp * XMMatrixTranslationFromVector(Trans);
 
 	if (mahKeys[VK_NUMPAD8])
-		temp = XMMatrixRotationX(XMConvertToRadians(80 * timeX.SmoothDelta())) * temp;
+		temp =  XMMatrixRotationX(XMConvertToRadians(-80 * sDelt)) * temp ;
 	if (mahKeys[VK_NUMPAD2])
-		temp = XMMatrixRotationX(XMConvertToRadians(-80 * timeX.SmoothDelta())) * temp;
+		temp = XMMatrixRotationX(XMConvertToRadians(80 * sDelt)) * temp;
 
-	
+	XMFLOAT4 MAX(1,1,1,1), MIN(-1,0,-1,0);
+	temp.r[1] = XMVectorClamp(temp.r[1], XMLoadFloat4(&MIN), XMLoadFloat4(&MAX));
 	XMStoreFloat4x4(&Spinny, temp);
 
 	temp = XMMatrixIdentity();
 	temp = temp * XMMatrixTranslation(newCamOffset.x, newCamOffset.y, newCamOffset.z);
-	XMStoreFloat4x4(&CamMovement, temp);
+	temp =  temp * XMLoadFloat4x4(&Spinny);
+	XMStoreFloat4x4(&m_view, XMMatrixInverse(NULL, temp));
 	ZeroMemory(&newCamOffset, sizeof(newCamOffset));
 
 	if (MStatus == MouseStatus::FREE && mahKeys[VK_CONTROL]){
@@ -344,10 +343,29 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 #pragma endregion
 
 	ID3D11Resource *iResource;
-	ZeroMemory(&iResource, sizeof(ID3D10Resource));
+	ZeroMemory(&iResource, sizeof(ID3D11Resource));
 	swapChain->GetBuffer(0, __uuidof(iResource), reinterpret_cast<void**>(&iResource));
 	iDevice->CreateRenderTargetView(iResource, NULL, &iRenderTarget);
 	iResource->Release(); 
+
+	D3D11_TEXTURE2D_DESC Stencil_Resource_desc;
+	ZeroMemory(&Stencil_Resource_desc, sizeof(D3D11_TEXTURE2D_DESC));
+	Stencil_Resource_desc.BindFlags = D3D11_BIND_FLAG::D3D11_BIND_DEPTH_STENCIL;
+	Stencil_Resource_desc.Usage = D3D11_USAGE::D3D11_USAGE_DEFAULT;
+	Stencil_Resource_desc.Format = DXGI_FORMAT::DXGI_FORMAT_D32_FLOAT;
+	Stencil_Resource_desc.Height = BACKBUFFER_HEIGHT;
+	Stencil_Resource_desc.Width = BACKBUFFER_WIDTH;
+	Stencil_Resource_desc.ArraySize = 1;
+	Stencil_Resource_desc.SampleDesc.Count = 1;
+
+	iDevice->CreateTexture2D(&Stencil_Resource_desc, NULL, &tx_DepthStencil);
+
+	D3D11_DEPTH_STENCIL_VIEW_DESC STENCIL_DESC;
+	ZeroMemory(&STENCIL_DESC, sizeof(D3D11_DEPTH_STENCIL_VIEW_DESC));
+	STENCIL_DESC.ViewDimension = D3D11_DSV_DIMENSION_TEXTURE2D;
+	STENCIL_DESC.Format = DXGI_FORMAT::DXGI_FORMAT_D32_FLOAT;
+
+	iDevice->CreateDepthStencilView(tx_DepthStencil, &STENCIL_DESC, &iDepthStencilView);
 
 	swapChain->GetDesc(&chainDesc);
 	ZeroMemory(&viewPort, sizeof(D3D11_VIEWPORT));
@@ -439,7 +457,7 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 	rotation_trix = XMMatrixRotationX(XMConvertToRadians(18));
 	view = XMMatrixMultiply(view, rotation_trix);
 	view = XMMatrixInverse(nullptr, view);
-	view = XMMatrixTranspose(view);
+	toShader_perspective.view = XMMatrixTranspose( view);	
 	XMStoreFloat4x4(&m_view, view);
 
 	// zNear = 0.1;
@@ -449,7 +467,6 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 	m_Projection = XMMatrixPerspectiveFovLH(XMConvertToRadians(90.0f), aspect, 0.1f, 1000.0f);
 	toShader_perspective.projection = XMMatrixTranspose(m_Projection);
 
-	toShader_perspective.view = XMLoadFloat4x4(&m_view);	
 
 #pragma endregion
 
@@ -489,7 +506,9 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 	view = rotation_trix * view;
 	view = XMMatrixInverse(nullptr, view);
 	XMStoreFloat4x4(&m_RTTView, view);
-	toShader_RTT.view = XMMatrixTranspose(view);
+	//toShader_RTT.view = XMMatrixTranspose(view);
+	toShader_RTT.view = XMLoadFloat4x4(&m_view);
+
 
 	toShader_RTT.model = XMMatrixIdentity();
 
@@ -627,7 +646,8 @@ bool DEMO_APP::Run()
 	timeX.Signal();
 	UpdateInput();
 
-	iDeviceContext->OMSetRenderTargets(1, &iRenderTarget, NULL);
+	iDeviceContext->ClearDepthStencilView(iDepthStencilView,D3D11_CLEAR_DEPTH,1,NULL);
+	iDeviceContext->OMSetRenderTargets(1, &iRenderTarget, iDepthStencilView);
 
 	FLOAT DarkBlue[] = { 0.0f, 0.0f, 0.45f, 1.0f };
 	FLOAT Black[] = { 0.0f, 0.0f, 0.0f, 1.0f };
@@ -636,16 +656,7 @@ bool DEMO_APP::Run()
 	FLOAT BLUE[] = { 0.0f, 0.0f, 1.0f, 1.0f };
 
 	iDeviceContext->RSSetViewports(1, &viewPort);
-	if (mahKeys[VK_W])
-		iDeviceContext->ClearRenderTargetView(iRenderTarget, GREEN);
-	else if (mahKeys[VK_S])
-		iDeviceContext->ClearRenderTargetView(iRenderTarget, RED);
-	else if (mahKeys[VK_A])
-		iDeviceContext->ClearRenderTargetView(iRenderTarget, Black);
-	else if (mahKeys[VK_D])
-		iDeviceContext->ClearRenderTargetView(iRenderTarget, BLUE);
-	else
-		iDeviceContext->ClearRenderTargetView(iRenderTarget, DarkBlue);
+	iDeviceContext->ClearRenderTargetView(iRenderTarget, DarkBlue);
 
 // <Mah 3d>
 	XMMATRIX cubeWorld= XMLoadFloat4x4(&m_CubeWorld);
@@ -653,8 +664,8 @@ bool DEMO_APP::Run()
 	toShader_perspective.model = XMMatrixTranspose(cubeWorld);
 	XMStoreFloat4x4(&m_CubeWorld, cubeWorld);
 
-	toShader_perspective.view = XMMatrixTranspose(XMLoadFloat4x4(&CamMovement)) * toShader_perspective.view ;
-	toShader_perspective.view = XMMatrixTranspose(XMLoadFloat4x4(&Spinny)) * toShader_perspective.view;
+	toShader_perspective.view =XMMatrixTranspose( XMLoadFloat4x4(&m_view)) ;
+	//toShader_perspective.view = XMMatrixTranspose(XMLoadFloat4x4(&Spinny)) * toShader_perspective.view;
 
 
 	D3D11_MAPPED_SUBRESOURCE map_cube;
@@ -701,8 +712,8 @@ bool DEMO_APP::Run()
 	iDeviceContext->VSSetConstantBuffers(0, 1, &cBuff_perspective);
 
 	iDeviceContext->DrawIndexed(12, 0, 0);
+	iDeviceContext->OMSetRenderTargets(1, &iRenderTarget, iDepthStencilView);
 
-	iDeviceContext->OMSetRenderTargets(1, &iRenderTarget, NULL);
 	iDeviceContext->PSSetShaderResources(0, 1, &RTT_ShaderView);
 
 // <RTT/>
@@ -738,6 +749,7 @@ bool DEMO_APP::Run()
 
 
 // <MultiViewport>
+
 	iDeviceContext->PSSetShaderResources(0, 1, &ShaderView);
 	XMMATRIX Hover = XMLoadFloat4x4(&m_hoverCam);
 	Hover = XMMatrixRotationY(XMConvertToRadians(turn*timeX.Delta() * -3.2f)) * Hover;
@@ -794,6 +806,9 @@ bool DEMO_APP::ShutDown()
 	RTT_ShaderView->Release();
 	tx_RTT->Release();
 	PixSha_RTT->Release();
+
+	tx_DepthStencil->Release();
+	iDepthStencilView->Release();
 
 	UnregisterClass( L"DirectXApplication", application ); 
 	return true;
@@ -879,8 +894,7 @@ int WINAPI wWinMain( HINSTANCE hInstance, HINSTANCE, LPTSTR, int )
 	return 0; 
 }
 
-// ********************************************************************* \\
-   *********************************************************************
+// ********************************************************************* 
 LRESULT CALLBACK WndProc( HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam )
 {
     if(GetAsyncKeyState(VK_ESCAPE))
