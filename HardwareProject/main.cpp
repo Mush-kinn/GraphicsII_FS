@@ -86,7 +86,7 @@ class DEMO_APP
 	XMFLOAT4X4 m_RTTView;
 	XMFLOAT4X4 m_RTTProjection;
 
-
+	XMFLOAT4X4 Spinny;
 	XMFLOAT4X4 CamMovement;
 	XMFLOAT3 newCamOffset;
 
@@ -206,11 +206,35 @@ void DEMO_APP::UpdateInput(){
 	if (mahKeys[VK_S])
 		newCamOffset.z += speed * timeX.SmoothDelta();
 
-	XMMATRIX temp;// = XMLoadFloat4x4(&CamMovement);
+	XMMATRIX temp;
+	temp = XMMatrixIdentity();
+
+	if (mahKeys[VK_NUMPAD4])
+		temp = XMMatrixRotationY(XMConvertToRadians(80 * timeX.SmoothDelta())) * temp;
+	if (mahKeys[VK_NUMPAD6])
+		temp = XMMatrixRotationY(XMConvertToRadians(-80 * timeX.SmoothDelta() )) * temp;
+
+	if (mahKeys[VK_NUMPAD8])
+		temp = XMMatrixRotationX(XMConvertToRadians(80 * timeX.SmoothDelta())) * temp;
+	if (mahKeys[VK_NUMPAD2])
+		temp = XMMatrixRotationX(XMConvertToRadians(-80 * timeX.SmoothDelta())) * temp;
+
+	
+	XMStoreFloat4x4(&Spinny, temp);
+
 	temp = XMMatrixIdentity();
 	temp = temp * XMMatrixTranslation(newCamOffset.x, newCamOffset.y, newCamOffset.z);
 	XMStoreFloat4x4(&CamMovement, temp);
 	ZeroMemory(&newCamOffset, sizeof(newCamOffset));
+
+	if (MStatus == MouseStatus::FREE && mahKeys[VK_CONTROL]){
+		ShowCursor(false);
+		MStatus = MouseStatus::LOCKED;
+	}
+	if (MStatus == MouseStatus::LOCKED && !mahKeys[VK_CONTROL]){
+		ShowCursor(true);
+		MStatus = MouseStatus::FREE;
+	}
 
 }
 
@@ -603,15 +627,6 @@ bool DEMO_APP::Run()
 	timeX.Signal();
 	UpdateInput();
 
-	if (MStatus == MouseStatus::FREE && mahKeys[VK_CONTROL]){
-		ShowCursor(false);
-		MStatus = MouseStatus::LOCKED;
-	}
-	if (MStatus == MouseStatus::LOCKED && !mahKeys[VK_CONTROL]){
-		ShowCursor(true);
-		MStatus = MouseStatus::FREE;
-	}
-
 	iDeviceContext->OMSetRenderTargets(1, &iRenderTarget, NULL);
 
 	FLOAT DarkBlue[] = { 0.0f, 0.0f, 0.45f, 1.0f };
@@ -639,6 +654,8 @@ bool DEMO_APP::Run()
 	XMStoreFloat4x4(&m_CubeWorld, cubeWorld);
 
 	toShader_perspective.view = XMMatrixTranspose(XMLoadFloat4x4(&CamMovement)) * toShader_perspective.view ;
+	toShader_perspective.view = XMMatrixTranspose(XMLoadFloat4x4(&Spinny)) * toShader_perspective.view;
+
 
 	D3D11_MAPPED_SUBRESOURCE map_cube;
 	ZeroMemory(&map_cube, sizeof(D3D11_MAPPED_SUBRESOURCE));
@@ -873,34 +890,34 @@ LRESULT CALLBACK WndProc( HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam 
         case ( WM_DESTROY ): { PostQuitMessage( 0 ); }
         break;
 		case (WM_KEYDOWN) : 
-			//if (wParam == VK_A)
-			//	DEMO_APP::UpdateKeyboardInput(VK_A, true);
 			switch (wParam)
 			{
-			case VK_A: DEMO_APP::UpdateKeyboardInput(VK_A, true); break;
-			case VK_W: DEMO_APP::UpdateKeyboardInput(VK_W, true); break;
-			case VK_S: DEMO_APP::UpdateKeyboardInput(VK_S, true); break;
-			case VK_D: DEMO_APP::UpdateKeyboardInput(VK_D, true); break;
-			case VK_CONTROL : DEMO_APP::UpdateKeyboardInput(VK_CONTROL, true, true); break;
-				
-			default:
-				break;
+				case VK_A: DEMO_APP::UpdateKeyboardInput(VK_A, true); break;
+				case VK_W: DEMO_APP::UpdateKeyboardInput(VK_W, true); break;
+				case VK_S: DEMO_APP::UpdateKeyboardInput(VK_S, true); break;
+				case VK_D: DEMO_APP::UpdateKeyboardInput(VK_D, true); break;
+				case VK_CONTROL : DEMO_APP::UpdateKeyboardInput(VK_CONTROL, true, true); break;
+				case VK_NUMPAD2: DEMO_APP::UpdateKeyboardInput(VK_NUMPAD2, true); break;
+				case VK_NUMPAD4: DEMO_APP::UpdateKeyboardInput(VK_NUMPAD4, true); break;
+				case VK_NUMPAD6: DEMO_APP::UpdateKeyboardInput(VK_NUMPAD6, true); break;
+				case VK_NUMPAD8: DEMO_APP::UpdateKeyboardInput(VK_NUMPAD8, true); break;
+				default:	break;
 			}
 			break;
 
 		case (WM_KEYUP):
-			//if (wParam == VK_A)
-			//	DEMO_APP::UpdateKeyboardInput(VK_A, false);
 			switch (wParam)
 			{
-			case VK_A: DEMO_APP::UpdateKeyboardInput(VK_A, false); break;
-			case VK_W: DEMO_APP::UpdateKeyboardInput(VK_W, false); break;
-			case VK_S: DEMO_APP::UpdateKeyboardInput(VK_S, false); break;
-			case VK_D: DEMO_APP::UpdateKeyboardInput(VK_D, false); break;
-			case VK_CONTROL: DEMO_APP::UpdateKeyboardInput(VK_CONTROL, false, true); break;
-
-			default:
-				break;
+				case VK_A: DEMO_APP::UpdateKeyboardInput(VK_A, false); break;
+				case VK_W: DEMO_APP::UpdateKeyboardInput(VK_W, false); break;
+				case VK_S: DEMO_APP::UpdateKeyboardInput(VK_S, false); break;
+				case VK_D: DEMO_APP::UpdateKeyboardInput(VK_D, false); break;
+				case VK_CONTROL: DEMO_APP::UpdateKeyboardInput(VK_CONTROL, false, true); break;
+				case VK_NUMPAD2: DEMO_APP::UpdateKeyboardInput(VK_NUMPAD2, false); break;
+				case VK_NUMPAD4: DEMO_APP::UpdateKeyboardInput(VK_NUMPAD4, false); break;
+				case VK_NUMPAD6: DEMO_APP::UpdateKeyboardInput(VK_NUMPAD6, false); break;
+				case VK_NUMPAD8: DEMO_APP::UpdateKeyboardInput(VK_NUMPAD8, false); break;
+				default:		break;
 			}
 
     }
