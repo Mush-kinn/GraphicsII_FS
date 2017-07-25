@@ -761,20 +761,16 @@ bool DEMO_APP::Run()
 	DeffContext_Default->FinishCommandList(false, &CmdList);
 	DeffContext_Model->FinishCommandList(false, &CmdList_Model000);
 	DeffContext_Zero->FinishCommandList(false, &CmdList_Zero000);
-
-	Debuger->ReportLiveDeviceObjects(D3D11_RLDO_DETAIL);
 	
 	iDeviceContext->ExecuteCommandList(CmdList, false);
 	iDeviceContext->ExecuteCommandList(CmdList_Model000, false);
 	iDeviceContext->ExecuteCommandList(CmdList_Zero000, false);
 
+	iDeviceContext->Flush();
+
 	CmdList->Release();
-	ZeroMemory(&CmdList, sizeof(ID3D11CommandList));
 	CmdList_Model000->Release();
 	CmdList_Zero000->Release();
-
-
-	Debuger->ReportLiveDeviceObjects(D3D11_RLDO_DETAIL);
 
 
 #if 0
@@ -896,10 +892,10 @@ bool DEMO_APP::ShutDown()
 	//DeffCOntext_RTT->Release();
 	DeffContext_Zero->Release();
 
-	CmdList_Default->Release();
-	CmdList_Model->Release();
+	//CmdList_Default->Release();
+	//CmdList_Model->Release();
 	//CmdList_RTT->Release();
-	CmdList_Zero->Release();
+	//CmdList_Zero->Release();
 	OutputDebugStringW(L"potetoo\n\n\n");
 
 	Debuger->ReportLiveDeviceObjects(D3D11_RLDO_DETAIL);
@@ -910,6 +906,7 @@ bool DEMO_APP::ShutDown()
 }
 
 void DEMO_APP::RenderDefault( ID3D11DeviceContext *iDeviceContext , XMFLOAT3 _Offset){
+
 
 	iDeviceContext->OMSetRenderTargets(1, &iRenderTarget, iDepthStencilView);
 	iDeviceContext->RSSetViewports(1, &viewPort);
