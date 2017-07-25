@@ -164,6 +164,12 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="AlphaDefines.h" />
+    <ClInclude Include="Assets\Portal\portal_bk.h" />
+    <ClInclude Include="Assets\Portal\portal_dn.h" />
+    <ClInclude Include="Assets\Portal\portal_ft.h" />
+    <ClInclude Include="Assets\Portal\portal_lf.h" />
+    <ClInclude Include="Assets\Portal\portal_rt.h" />
+    <ClInclude Include="Assets\Portal\portal_up.h" />
     <ClInclude Include="Assets\Test_UV_Map.h" />
     <ClInclude Include="XTime.h" />
   </ItemGroup>
@@ -204,6 +210,12 @@
     <None Include="SampleVertexShader.csh" />
   </ItemGroup>
   <ItemGroup>
+    <Image Include="Assets\Portal\portal_bk.tga" />
+    <Image Include="Assets\Portal\portal_ft.tga" />
+    <Image Include="Assets\Portal\portal_lf.tga" />
+    <Image Include="Assets\Portal\portal_rt.tga" />
+    <Image Include="Assets\Portal\portal_up.tga" />
+    <Image Include="Assets\SkyboxOcean.dds" />
     <Image Include="Assets\Test_UV_Map.dds" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
