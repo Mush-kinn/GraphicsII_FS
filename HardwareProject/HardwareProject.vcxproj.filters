@@ -29,6 +29,9 @@
     <ClInclude Include="Assets\Test_UV_Map.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="AlphaDefines.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="Trivial_PS.hlsl" />
