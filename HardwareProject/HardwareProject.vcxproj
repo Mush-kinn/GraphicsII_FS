@@ -159,6 +159,7 @@
     </FxCompile>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="DDSTextureLoader.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="XTime.cpp" />
   </ItemGroup>
@@ -171,6 +172,7 @@
     <ClInclude Include="Assets\Portal\portal_rt.h" />
     <ClInclude Include="Assets\Portal\portal_up.h" />
     <ClInclude Include="Assets\Test_UV_Map.h" />
+    <ClInclude Include="DDSTextureLoader.h" />
     <ClInclude Include="XTime.h" />
   </ItemGroup>
   <ItemGroup>

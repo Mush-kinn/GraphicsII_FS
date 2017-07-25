@@ -27,11 +27,11 @@ using namespace DirectX;
 
 #include "Trivial_PS.csh"
 #include "Trivial_VS.csh"
-
 #include "SampleVertexShader.csh"
 #include "SamplePixelShader.csh"
-
 #include "RTT_PixelShader.csh"
+
+#include "DDSTextureLoader.h"
 
 #define BACKBUFFER_WIDTH	500
 #define BACKBUFFER_HEIGHT	500
@@ -90,6 +90,7 @@ class DEMO_APP
 	XMFLOAT4X4 m_hoverCam;
 	XMFLOAT4X4 m_RTTView;
 	XMFLOAT4X4 m_RTTProjection;
+	XMFLOAT4X4 m_BoxWorld;
 
 	XMFLOAT4X4 Spinny;
 
@@ -105,6 +106,8 @@ class DEMO_APP
 	ID3D11Buffer *cBuff_perspective;
 	ID3D11Buffer *vb_Platform;
 	ID3D11Buffer *ib_Platform;
+	ID3D11Buffer *vb_Box;
+	ID3D11Buffer *ib_Box;
 
 	// Layouts
 	ID3D11InputLayout *lay_perspective;
@@ -133,7 +136,7 @@ class DEMO_APP
 
 	// Pending...
 	ID3D11SamplerState *SampleState;
-
+	
 	ID3D11Device *iDevice;
 	ID3D11DeviceContext *iDeviceContext;
 	D3D11_VIEWPORT viewPort;
@@ -387,9 +390,36 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 
 	iDevice->CreateShaderResourceView(tx_UVMap, &Shaderview_desc, &ShaderView);
 
-	//CreateDDSTextureFromFile(iDevice, L"HardwareProject\Assets\SkyboxOcean.dds", &tx_Skybox, &SkyboxView);	
+	CreateDDSTextureFromFile(iDevice, L"Assets\\Portal\\PortalSkybox.dds", (ID3D11Resource **)&tx_Skybox, &SkyboxView);	
 
-#if 1
+	VERTEX_3D realCube[8] = {
+			{ XMFLOAT3(-1, 1, -1), XMFLOAT2(0, 0) }, { XMFLOAT3(1, 1, -1), XMFLOAT2(1, 0) },
+			{ XMFLOAT3(-1, -1, -1), XMFLOAT2(0, 1) }, { XMFLOAT3(1, -1, -1), XMFLOAT2(1, 1) },
+			{ XMFLOAT3(1, 1, 1), XMFLOAT2(0, 0) }, { XMFLOAT3(-1, 1, 1), XMFLOAT2(1, 0) },
+			{ XMFLOAT3(1, -1, 1), XMFLOAT2(0, 1) },{ XMFLOAT3(-1, -1,-1), XMFLOAT2(1, 1) }
+	};
+
+	D3D11_BUFFER_DESC box_desc;
+	ZeroMemory(&box_desc, sizeof(D3D11_BUFFER_DESC));
+	box_desc.Usage = D3D11_USAGE::D3D11_USAGE_IMMUTABLE;
+	box_desc.BindFlags = D3D11_BIND_FLAG::D3D11_BIND_VERTEX_BUFFER;
+	box_desc.ByteWidth = sizeof(VERTEX_3D) * 8;
+
+	D3D11_SUBRESOURCE_DATA box_data;
+	ZeroMemory(&box_data, sizeof(D3D11_SUBRESOURCE_DATA));
+	box_data.pSysMem = realCube;
+
+	iDevice->CreateBuffer(&box_desc,&box_data,&vb_Box);
+
+	unsigned int indx = 0, one, two, three;
+	vector<unsigned int> box_indx;
+	for (unsigned int i = 0; i < 36; i+=4){
+		
+	}
+
+	box_indx.data();
+
+#if 0
 	D3D11_TEXTURE2D_DESC Skybox_Tx_desc;
 	ZeroMemory(&Skybox_Tx_desc, sizeof(D3D11_TEXTURE2D_DESC));
 	Skybox_Tx_desc.SampleDesc.Count = 1;
@@ -430,10 +460,7 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 
 
 #endif // 0
-
-
-
-
+	
 #pragma endregion
 
 	ID3D11Resource *iResource;
@@ -486,7 +513,7 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 // <Mah 3D>
 
 #pragma region DefaultShape
-	unsigned int indx = 0;
+	indx = 0;
 
 	VERTEX_3D aTri[4] = { 
 			{ XMFLOAT3(0, 0.8f, 0), XMFLOAT2(0.5f, 0)},
@@ -750,9 +777,6 @@ bool DEMO_APP::Run()
 
 	FLOAT DarkBlue[] = { 0.0f, 0.0f, 0.45f, 1.0f };
 	FLOAT Black[] = { 0.0f, 0.0f, 0.0f, 1.0f };
-	FLOAT RED[] = { 1.0f, 0.0f, 0.0f, 1.0f };
-	FLOAT GREEN[] = { 0.0f, 1.0f, 0.0f, 1.0f };
-	FLOAT BLUE[] = { 0.0f, 0.0f, 1.0f, 1.0f };
 
 	iDeviceContext->RSSetViewports(1, &viewPort);
 	iDeviceContext->ClearRenderTargetView(iRenderTarget, DarkBlue);
@@ -765,7 +789,6 @@ bool DEMO_APP::Run()
 
 	toShader_perspective.view =XMMatrixTranspose( XMLoadFloat4x4(&m_view)) ;
 	//toShader_perspective.view = XMMatrixTranspose(XMLoadFloat4x4(&Spinny)) * toShader_perspective.view;
-
 
 	D3D11_MAPPED_SUBRESOURCE map_cube;
 	ZeroMemory(&map_cube, sizeof(D3D11_MAPPED_SUBRESOURCE));
@@ -908,6 +931,10 @@ bool DEMO_APP::ShutDown()
 
 	tx_DepthStencil->Release();
 	iDepthStencilView->Release();
+
+	tx_Skybox->Release();
+	SkyboxView->Release();
+	
 
 	Debuger->ReportLiveDeviceObjects(D3D11_RLDO_DETAIL);
 	Debuger->Release();
