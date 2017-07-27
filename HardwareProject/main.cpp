@@ -78,6 +78,7 @@ class DEMO_APP
 	float turn;
 	XTime timeX;
 	unsigned int ObjIndxCount;
+	unsigned int qty_Box;
 	static bool mahKeys[256];
 	static std::vector<UINT> KeyStateON;
 	static std::vector<UINT> KeyStateOFF;
@@ -192,6 +193,7 @@ public:
 	bool Run();
 	bool ShutDown();
 	bool LoadObjFile(const char *_filename, std::vector<VERTEX_OBJMODEL> &_forVB);
+	void CreateObj();
 	bool LoadDefault();
 	bool LoadRTT();
 
@@ -253,9 +255,9 @@ void DEMO_APP::UpdateInput(){
 		temp = XMMatrixIdentity();
 
 		if (mahKeys[VK_NUMPAD4])
-			temp = XMMatrixRotationY(XMConvertToRadians(-80 * sDelt)) *temp;
+			temp = XMMatrixRotationY(XMConvertToRadians(-90 * sDelt)) *temp;
 		if (mahKeys[VK_NUMPAD6])
-			temp = XMMatrixRotationY(XMConvertToRadians(80 * sDelt)) *temp;
+			temp = XMMatrixRotationY(XMConvertToRadians(90 * sDelt)) *temp;
 
 		INverted = XMMatrixInverse(NULL, XMLoadFloat4x4(&m_view));
 		XMMatrixDecompose(&Scale, &Rot, &Trans, INverted);
@@ -263,9 +265,9 @@ void DEMO_APP::UpdateInput(){
 		temp = temp * XMMatrixTranslationFromVector(Trans);
 
 		if (mahKeys[VK_NUMPAD8])
-			temp = XMMatrixRotationX(XMConvertToRadians(-80 * sDelt)) * temp;
+			temp = XMMatrixRotationX(XMConvertToRadians(-90 * sDelt)) * temp;
 		if (mahKeys[VK_NUMPAD2])
-			temp = XMMatrixRotationX(XMConvertToRadians(80 * sDelt)) * temp;
+			temp = XMMatrixRotationX(XMConvertToRadians(90 * sDelt)) * temp;
 
 		XMFLOAT4 MAX(1, 1, 1, 1), MIN(-1, 0, -1, 0);
 		temp.r[1] = XMVectorClamp(temp.r[1], XMLoadFloat4(&MIN), XMLoadFloat4(&MAX));
@@ -275,6 +277,7 @@ void DEMO_APP::UpdateInput(){
 		temp = temp * XMMatrixTranslation(newCamOffset.x, newCamOffset.y, newCamOffset.z);
 		temp = temp * XMLoadFloat4x4(&Spinny);
 		XMStoreFloat4x4(&m_view, XMMatrixInverse(NULL, temp));
+		//XMStoreFloat4x4(&m_BoxWorld, XMMatrixTranslationFromVector(Trans));
 	}
 	else{
 		XMMATRIX temp = XMMatrixIdentity();
@@ -334,6 +337,8 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 	//********************* END WARNING ************************//
 
 
+
+
 	DXGI_SWAP_CHAIN_DESC chainDesc;
 	ZeroMemory(&chainDesc, sizeof(DXGI_SWAP_CHAIN_DESC));
 	chainDesc.BufferCount = 1;
@@ -360,6 +365,9 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 		&FeatureLevelsRequested, numLevelsRequested, D3D11_SDK_VERSION, &chainDesc, &swapChain, 
 		&iDevice, &FeatureLevelsSupported, &iDeviceContext);
 #endif
+// <THREAD MODEL LOADING/>
+	thread objloader(&DEMO_APP::CreateObj, this);
+// <THREAD MODEL LOADING/>
 
 	iDevice->CreateDeferredContext(NULL, &DeffContext_Default);
 	iDevice->CreateDeferredContext(NULL, &DeffContext_Zero);
@@ -413,6 +421,7 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 
 	CreateDDSTextureFromFile(iDevice, L"Assets\\Portal\\PortalSkybox.dds", (ID3D11Resource **)&tx_Skybox, &SkyboxView);	
 
+	XMStoreFloat4x4(&m_BoxWorld, XMMatrixIdentity());
 	VERTEX_3D realCube[8] = {
 			{ XMFLOAT3(-1, 1, -1), XMFLOAT2(0, 0) }, { XMFLOAT3(1, 1, -1), XMFLOAT2(1, 0) },
 			{ XMFLOAT3(-1, -1, -1), XMFLOAT2(0, 1) }, { XMFLOAT3(1, -1, -1), XMFLOAT2(1, 1) },
@@ -434,53 +443,66 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 
 	unsigned int indx = 0, one, two, three;
 	vector<unsigned int> box_indx;
-	for (unsigned int i = 0; i < 36; i+=4){
-		
-	}
 
-	box_indx.data();
+	// Front Face 
+	box_indx.push_back(1);
+	box_indx.push_back(0);
+	box_indx.push_back(2);
+	box_indx.push_back(2);
+	box_indx.push_back(3);
+	box_indx.push_back(1);
+	// Back Face
+	box_indx.push_back(5);
+	box_indx.push_back(4);
+	box_indx.push_back(6);
+	box_indx.push_back(6);
+	box_indx.push_back(7);
+	box_indx.push_back(5);
+	// Right
+	box_indx.push_back(4);
+	box_indx.push_back(1);
+	box_indx.push_back(3);
+	box_indx.push_back(3);
+	box_indx.push_back(6);
+	box_indx.push_back(4);
+	// Left
+	box_indx.push_back(0);
+	box_indx.push_back(5);
+	box_indx.push_back(7);
+	box_indx.push_back(7);
+	box_indx.push_back(2);
+	box_indx.push_back(0);
+	// Top
+	box_indx.push_back(4);
+	box_indx.push_back(5);
+	box_indx.push_back(0);
+	box_indx.push_back(0);
+	box_indx.push_back(1);
+	box_indx.push_back(4);
+	// Bottom
+	box_indx.push_back(3);
+	box_indx.push_back(2);
+	box_indx.push_back(7);
+	box_indx.push_back(7);
+	box_indx.push_back(6);
+	box_indx.push_back(3);
 
-#if 0
-	D3D11_TEXTURE2D_DESC Skybox_Tx_desc;
-	ZeroMemory(&Skybox_Tx_desc, sizeof(D3D11_TEXTURE2D_DESC));
-	Skybox_Tx_desc.SampleDesc.Count = 1;
-	Skybox_Tx_desc.Format = DXGI_FORMAT::DXGI_FORMAT_B8G8R8A8_UNORM_SRGB;
-	Skybox_Tx_desc.BindFlags = D3D11_BIND_FLAG::D3D11_BIND_SHADER_RESOURCE;
-	Skybox_Tx_desc.MiscFlags = D3D11_RESOURCE_MISC_FLAG::D3D11_RESOURCE_MISC_TEXTURECUBE;
-	Skybox_Tx_desc.Usage = D3D11_USAGE::D3D11_USAGE_IMMUTABLE;
-	Skybox_Tx_desc.ArraySize = 6;
-	Skybox_Tx_desc.Height = 512;
-	Skybox_Tx_desc.Width = 512;
-	Skybox_Tx_desc.MipLevels = 10;
-
-	D3D11_SHADER_RESOURCE_VIEW_DESC Skybox_view_desc;
-	ZeroMemory(&Skybox_view_desc, sizeof(D3D11_SHADER_RESOURCE_VIEW_DESC));
-	Skybox_view_desc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURECUBE;
-	Skybox_view_desc.Format = DXGI_FORMAT::DXGI_FORMAT_B8G8R8A8_UNORM_SRGB;
-	Skybox_view_desc.TextureCube.MipLevels = 10;
-	Skybox_view_desc.TextureCube.MostDetailedMip = 0;
+	qty_Box = box_indx.size();
 
 
-	const unsigned int *Poteto[6];
-	Poteto[D3D11_TEXTURECUBE_FACE::D3D11_TEXTURECUBE_FACE_POSITIVE_X] = PORTAL_RT_PIXELS;
-	Poteto[D3D11_TEXTURECUBE_FACE::D3D11_TEXTURECUBE_FACE_NEGATIVE_X] = PORTAL_LF_PIXELS;
-	Poteto[D3D11_TEXTURECUBE_FACE::D3D11_TEXTURECUBE_FACE_POSITIVE_Y] = PORTAL_UP_PIXELS;
-	Poteto[D3D11_TEXTURECUBE_FACE::D3D11_TEXTURECUBE_FACE_NEGATIVE_Y] = PORTAL_DN_PIXELS;
-	Poteto[D3D11_TEXTURECUBE_FACE::D3D11_TEXTURECUBE_FACE_POSITIVE_Z] = PORTAL_FT_PIXELS;
-	Poteto[D3D11_TEXTURECUBE_FACE::D3D11_TEXTURECUBE_FACE_NEGATIVE_Z] = PORTAL_BK_PIXELS;
-	D3D11_SUBRESOURCE_DATA Skybox_Sub[10]; // 10 miplevels, 6 slices
-	
-	for (unsigned int i = 0; i < 10; ++i){
-		ZeroMemory(&Skybox_Sub[i], sizeof(Skybox_Sub[i]));
-		Skybox_Sub[i].pSysMem = &Poteto[i][portal_bk_leveloffsets[i]];
-		Skybox_Sub[i].SysMemPitch = (portal_bk_width >> i) * sizeof(unsigned int);
-		Skybox_Sub[i].SysMemSlicePitch = portal_bk_numpixels * sizeof(unsigned int);
-	}
-	iDevice->CreateTexture2D(&Skybox_Tx_desc, Skybox_Sub, &tx_Skybox);
+	D3D11_BUFFER_DESC indx_box_desc;
+	ZeroMemory(&indx_box_desc, sizeof(D3D11_BUFFER_DESC));
+	indx_box_desc.Usage = D3D11_USAGE::D3D11_USAGE_DEFAULT;
+	indx_box_desc.BindFlags = D3D11_BIND_FLAG::D3D11_BIND_INDEX_BUFFER;
+	indx_box_desc.ByteWidth = sizeof(unsigned int) * qty_Box;
 
+	D3D11_SUBRESOURCE_DATA indx_sub_box;
+	ZeroMemory(&indx_sub_box, sizeof(D3D11_SUBRESOURCE_DATA));
+	indx_sub_box = box_data;
 
+	iDevice->CreateBuffer(&indx_box_desc, &indx_sub_box, &ib_Box);
+	Debuger->ReportLiveDeviceObjects(D3D11_RLDO_DETAIL);
 
-#endif // 0
 	
 #pragma endregion
 
@@ -719,6 +741,7 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 
 #pragma region Load
 // <Prototype Loader>
+#if 0
 	std::vector<VERTEX_OBJMODEL> vObjModel;
 	LoadObjFile("Assets\\BasicPlatform\\wall.obj", vObjModel);
 
@@ -737,11 +760,11 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 
 	std::vector<unsigned int> modelIndices;
 	unsigned int Fst, Mid, Trd;
-	for (unsigned int i = 0; i < vObjModel.size(); i+=4){
+	for (unsigned int i = 0; i < vObjModel.size(); i += 4){
 		Fst = i;
 		Mid = i + 1;
 		Trd = i + 2;
-		
+
 		modelIndices.push_back(Fst);
 		modelIndices.push_back(Mid);
 		modelIndices.push_back(Trd);
@@ -775,6 +798,10 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 
 	iDevice->CreateInputLayout(layout_desc, 3, &SampleVertexShader, sizeof(SampleVertexShader), &lay_OBJModel);
 
+#endif // 0
+
+	objloader.join();
+
 // <Prototype Loader/>
 #pragma endregion
 
@@ -804,7 +831,7 @@ bool DEMO_APP::Run()
 
 // <Mah 3d>
 	XMMATRIX cubeWorld= XMLoadFloat4x4(&m_CubeWorld);
-	cubeWorld = XMMatrixRotationY(-XMConvertToRadians(turn*timeX.Delta()))*cubeWorld;
+	cubeWorld = XMMatrixRotationZ(-XMConvertToRadians(turn*timeX.Delta()))*cubeWorld;
 	toShader_perspective.model = XMMatrixTranspose(cubeWorld);
 	XMStoreFloat4x4(&m_CubeWorld, cubeWorld);
 
@@ -819,12 +846,10 @@ bool DEMO_APP::Run()
 
 	UINT _startSlot = 0;
 	UINT _numBuffs = 1;
-	UINT _strides[D3D11_IA_VERTEX_INPUT_RESOURCE_SLOT_COUNT];
-	UINT _offSets[D3D11_IA_VERTEX_INPUT_RESOURCE_SLOT_COUNT];
-	ZeroMemory(_strides, sizeof(_strides));
-	ZeroMemory(_offSets, sizeof(_offSets));
-	_strides[0] = static_cast<UINT>(sizeof(VERTEX_3D));
-	iDeviceContext->IASetVertexBuffers(0, 1, &vb_Cube, _strides, _offSets);
+	UINT _strides = 0;
+	UINT _offSets = 0;
+	_strides = static_cast<UINT>(sizeof(VERTEX_3D));
+	iDeviceContext->IASetVertexBuffers(0, 1, &vb_Cube, &_strides, &_offSets);
 
 	iDeviceContext->IASetIndexBuffer(ib_Cube, DXGI_FORMAT::DXGI_FORMAT_R32_UINT, 0);
 
@@ -846,15 +871,29 @@ bool DEMO_APP::Run()
 
 	thread step3(&DEMO_APP::RenderDefault,this, DeffContext_Model, XMFLOAT3(0, 3, 0));
 
+// Skybox
+	toShader_perspective.model = XMMatrixTranspose(XMLoadFloat4x4(&m_BoxWorld));
+	ZeroMemory(&map_cube, sizeof(D3D11_MAPPED_SUBRESOURCE));
+	iDeviceContext->Map(cBuff_perspective, 0, D3D11_MAP::D3D11_MAP_WRITE_DISCARD, NULL, &map_cube);
+	memcpy(map_cube.pData, &toShader_perspective, sizeof(toShader_perspective));
+	iDeviceContext->Unmap(cBuff_perspective, 0);
+	
+	iDeviceContext->IAGetVertexBuffers(0, 1, &vb_Box, &_strides, &_offSets);
+	iDeviceContext->IASetIndexBuffer(ib_Box, DXGI_FORMAT_R32_UINT, 0);
 
+	iDeviceContext->DrawIndexed(qty_Box, 0, 0);
+// Skybox end
 
-#if 1
 
 // <RTT>
 	iDeviceContext->ClearRenderTargetView(RTT_RenderTarget, Black);
 	iDeviceContext->OMSetRenderTargets(1, &RTT_RenderTarget, NULL);
 	cubeWorld = XMLoadFloat4x4(&m_CubeWorld);
 	toShader_RTT.model = XMMatrixTranspose(cubeWorld);
+
+	_strides = static_cast<UINT>(sizeof(VERTEX_3D));
+	iDeviceContext->IASetVertexBuffers(0, 1, &vb_Cube, &_strides, &_offSets);
+	iDeviceContext->IASetIndexBuffer(ib_Cube, DXGI_FORMAT::DXGI_FORMAT_R32_UINT, 0);
 	
 	ZeroMemory(&map_cube, sizeof(D3D11_MAPPED_SUBRESOURCE));
 	iDeviceContext->Map(cBuff_perspective, 0, D3D11_MAP::D3D11_MAP_WRITE_DISCARD, NULL, &map_cube);
@@ -897,7 +936,7 @@ bool DEMO_APP::Run()
 	iDeviceContext->PSSetShader(PixSha_perspective,0,0);
 // <RTT/>
 
-#endif
+
 
 // <MultiViewport>
 
@@ -914,8 +953,9 @@ bool DEMO_APP::Run()
 	memcpy(map_cube.pData, &toshader_hoverCam, sizeof(toshader_hoverCam));
 	iDeviceContext->Unmap(cBuff_perspective, 0);
 	iDeviceContext->VSSetConstantBuffers(0, 1, &cBuff_perspective);
+	_strides = static_cast<UINT>(sizeof(VERTEX_3D));
 
-	iDeviceContext->IASetVertexBuffers(0, 1, &vb_Cube, _strides, _offSets);
+	iDeviceContext->IASetVertexBuffers(0, 1, &vb_Cube, &_strides, &_offSets);
 	iDeviceContext->IASetIndexBuffer(ib_Cube, DXGI_FORMAT::DXGI_FORMAT_R32_UINT, 0);
 	iDeviceContext->IASetInputLayout(lay_perspective);
 	iDeviceContext->RSSetViewports(1, &hovCam_view);
@@ -989,11 +1029,13 @@ bool DEMO_APP::ShutDown()
 	tx_Skybox->Release();
 	SkyboxView->Release();
 	
+	vb_Box->Release();
+	ib_Box->Release();
 	DeffContext_Default->Release();
 	DeffContext_Model->Release();
-	//DeffCOntext_RTT->Release();
 	DeffContext_Zero->Release();
 	OutputDebugStringW(L"\n\n\n poteto \n\n\n");
+
 
 	Debuger->ReportLiveDeviceObjects(D3D11_RLDO_DETAIL);
 	Debuger->Release();
@@ -1008,7 +1050,7 @@ void DEMO_APP::RenderDefault( ID3D11DeviceContext *iDeviceContext , XMFLOAT3 _Of
 	iDeviceContext->RSSetViewports(1, &viewPort);
 
 	XMMATRIX cubeWorld = XMLoadFloat4x4(&m_CubeWorld);
-	cubeWorld = XMMatrixRotationY(-XMConvertToRadians(turn*timeX.Delta()))*cubeWorld;
+	cubeWorld = XMMatrixRotationZ(-XMConvertToRadians(turn*timeX.Delta()))*cubeWorld;
 	//XMStoreFloat4x4(&m_CubeWorld, cubeWorld);
 	cubeWorld = cubeWorld * XMMatrixTranslationFromVector(XMLoadFloat3(&_Offset));
 	toShader_perspective.model = XMMatrixTranspose(cubeWorld);
@@ -1167,3 +1209,64 @@ LRESULT CALLBACK WndProc( HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam 
     return DefWindowProc( hWnd, message, wParam, lParam );
 }
 //********************* END WARNING ************************//
+
+
+void DEMO_APP::CreateObj(){
+	// <Prototype Loader>
+	std::vector<VERTEX_OBJMODEL> vObjModel;
+	LoadObjFile("Assets\\BasicPlatform\\wall.obj", vObjModel);
+
+	D3D11_BUFFER_DESC vModel_desc;
+	ZeroMemory(&vModel_desc, sizeof(D3D11_BUFFER_DESC));
+	vModel_desc.BindFlags = D3D11_BIND_FLAG::D3D11_BIND_VERTEX_BUFFER;
+	vModel_desc.Usage = D3D11_USAGE::D3D11_USAGE_IMMUTABLE;
+	vModel_desc.ByteWidth = sizeof(VERTEX_OBJMODEL)*vObjModel.size();
+
+	D3D11_SUBRESOURCE_DATA vSub_Model;
+	ZeroMemory(&vSub_Model, sizeof(D3D11_SUBRESOURCE_DATA));
+	vSub_Model.pSysMem = vObjModel.data();
+
+	iDevice->CreateBuffer(&vModel_desc, &vSub_Model, &vb_Platform);
+
+	std::vector<unsigned int> modelIndices;
+	unsigned int Fst, Mid, Trd;
+	for (unsigned int i = 0; i < vObjModel.size(); i += 4){
+		Fst = i;
+		Mid = i + 1;
+		Trd = i + 2;
+
+		modelIndices.push_back(Fst);
+		modelIndices.push_back(Mid);
+		modelIndices.push_back(Trd);
+
+		Fst = Trd;
+		Mid = i + 3;
+		Trd = i;
+
+		modelIndices.push_back(Fst);
+		modelIndices.push_back(Mid);
+		modelIndices.push_back(Trd);
+	}
+	ObjIndxCount = modelIndices.size();
+
+	D3D11_BUFFER_DESC iModel_desc;
+	ZeroMemory(&iModel_desc, sizeof(D3D11_BUFFER_DESC));
+	iModel_desc.Usage = D3D11_USAGE::D3D11_USAGE_DEFAULT;
+	iModel_desc.BindFlags = D3D11_BIND_FLAG::D3D11_BIND_INDEX_BUFFER;
+	iModel_desc.ByteWidth = sizeof(unsigned int) * ObjIndxCount;
+
+	ZeroMemory(&vSub_Model, sizeof(D3D11_SUBRESOURCE_DATA));
+	vSub_Model.pSysMem = modelIndices.data();
+
+	iDevice->CreateBuffer(&iModel_desc, &vSub_Model, &ib_Platform);
+
+	D3D11_INPUT_ELEMENT_DESC layout_desc[3];
+
+	layout_desc[0] = { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 };
+	layout_desc[1] = { "TEXCOORD", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 };
+	layout_desc[2] = { "NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 };
+
+	iDevice->CreateInputLayout(layout_desc, 3, &SampleVertexShader, sizeof(SampleVertexShader), &lay_OBJModel);
+
+	// <Prototype Loader/>
+}
