@@ -13,12 +13,18 @@
       <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
       <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
     </Filter>
+    <Filter Include="Header Files\SkyboxPortal">
+      <UniqueIdentifier>{fe57d3a2-50ab-4e29-aafe-abf281d8e2c6}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="XTime.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="main.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="DDSTextureLoader.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
@@ -30,6 +36,27 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="AlphaDefines.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Assets\Portal\portal_bk.h">
+      <Filter>Header Files\SkyboxPortal</Filter>
+    </ClInclude>
+    <ClInclude Include="Assets\Portal\portal_dn.h">
+      <Filter>Header Files\SkyboxPortal</Filter>
+    </ClInclude>
+    <ClInclude Include="Assets\Portal\portal_ft.h">
+      <Filter>Header Files\SkyboxPortal</Filter>
+    </ClInclude>
+    <ClInclude Include="Assets\Portal\portal_lf.h">
+      <Filter>Header Files\SkyboxPortal</Filter>
+    </ClInclude>
+    <ClInclude Include="Assets\Portal\portal_rt.h">
+      <Filter>Header Files\SkyboxPortal</Filter>
+    </ClInclude>
+    <ClInclude Include="Assets\Portal\portal_up.h">
+      <Filter>Header Files\SkyboxPortal</Filter>
+    </ClInclude>
+    <ClInclude Include="DDSTextureLoader.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
@@ -52,6 +79,24 @@
   </ItemGroup>
   <ItemGroup>
     <Image Include="Assets\Test_UV_Map.dds">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="Assets\SkyboxOcean.dds">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="Assets\Portal\portal_ft.tga">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="Assets\Portal\portal_lf.tga">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="Assets\Portal\portal_rt.tga">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="Assets\Portal\portal_up.tga">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="Assets\Portal\portal_bk.tga">
       <Filter>Resource Files</Filter>
     </Image>
   </ItemGroup>

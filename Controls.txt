@@ -1,0 +1,16 @@
+WASD: Forward / Left / Backwards / Right;
+Q/E: Descend / Ascend;
+T: Toggle tracking;
+NUMPAD 8-4-2-6: Look up / Turn Left / Look Down / Turn Right;
+
+CTRL: Hide mouse cursor*;
+
+
+
+
+
+
+
+
+
+*note: Incomplete feature. Pending mouse camera control. Hiding/locking mouse would enable camera control while hiding (and locking) the mouse cursor. Unlocking the mouse would cease camera control and allow mouse movement; in practice to click on UI items for example.

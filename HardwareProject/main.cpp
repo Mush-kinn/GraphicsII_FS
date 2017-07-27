@@ -7,6 +7,7 @@
 #include "XTime.h"
 #include <vector>
 #include <thread>
+//#include "DDSTextureLoader.h"
 
 using namespace std;
 
@@ -15,15 +16,22 @@ using namespace std;
 #include <DirectXMath.h>
 using namespace DirectX;
 #include "Assets\Test_UV_Map.h"
+#include "Assets\Portal\portal_bk.h"
+#include "Assets\Portal\portal_dn.h"
+#include "Assets\Portal\portal_ft.h"
+#include "Assets\Portal\portal_lf.h"
+#include "Assets\Portal\portal_rt.h"
+#include "Assets\Portal\portal_up.h"
+
 #include "AlphaDefines.h"
 
 #include "Trivial_PS.csh"
 #include "Trivial_VS.csh"
-
 #include "SampleVertexShader.csh"
 #include "SamplePixelShader.csh"
-
 #include "RTT_PixelShader.csh"
+
+#include "DDSTextureLoader.h"
 
 #define BACKBUFFER_WIDTH	500
 #define BACKBUFFER_HEIGHT	500
@@ -36,11 +44,19 @@ using namespace DirectX;
 
 #define TEST_UV_MAP_PIXELS Test_UV_Map_pixels
 
-#pragma endregion
+#define PORTAL_BK_PIXELS portal_bk_pixels
 
-#ifndef VK_A
-#define VK_A 0x41
-#endif
+#define PORTAL_DN_PIXELS portal_dn_pixels
+
+#define PORTAL_FT_PIXELS portal_ft_pixels
+
+#define PORTAL_LF_PIXELS portal_lf_pixels
+
+#define PORTAL_RT_PIXELS portal_rt_pixels
+
+#define PORTAL_UP_PIXELS portal_up_pixels
+
+#pragma endregion
 
 enum MouseBehave{ MIA, IDLE, MOVING };
 enum MouseStatus{ LOCKED, FREE };
@@ -66,7 +82,7 @@ class DEMO_APP
 	static std::vector<UINT> KeyStateON;
 	static std::vector<UINT> KeyStateOFF;
 	MouseStatus MStatus = MouseStatus::FREE;
-
+	
 	// Matrices
 	XMFLOAT4X4 m_view;
 	XMMATRIX m_Projection;
@@ -74,6 +90,7 @@ class DEMO_APP
 	XMFLOAT4X4 m_hoverCam;
 	XMFLOAT4X4 m_RTTView;
 	XMFLOAT4X4 m_RTTProjection;
+	XMFLOAT4X4 m_BoxWorld;
 
 	XMFLOAT4X4 Spinny;
 
@@ -89,6 +106,8 @@ class DEMO_APP
 	ID3D11Buffer *cBuff_perspective;
 	ID3D11Buffer *vb_Platform;
 	ID3D11Buffer *ib_Platform;
+	ID3D11Buffer *vb_Box;
+	ID3D11Buffer *ib_Box;
 
 	// Layouts
 	ID3D11InputLayout *lay_perspective;
@@ -98,11 +117,13 @@ class DEMO_APP
 	ID3D11VertexShader *VertSha_perspective;
 	ID3D11PixelShader *PixSha_perspective;
 	ID3D11PixelShader *PixSha_RTT;
+	
 
 	// textures
 	ID3D11Texture2D *tx_UVMap;
 	ID3D11Texture2D *tx_RTT;
 	ID3D11Texture2D *tx_DepthStencil;
+	ID3D11Texture2D *tx_Skybox;
 
 	// Views
 	ID3D11RenderTargetView *iRenderTarget;
@@ -111,6 +132,7 @@ class DEMO_APP
 	D3D11_VIEWPORT hovCam_view;
 	ID3D11ShaderResourceView *RTT_ShaderView;
 	ID3D11DepthStencilView *iDepthStencilView;
+	ID3D11ShaderResourceView *SkyboxView;
 
 	// Pending...
 	ID3D11SamplerState *SampleState;
@@ -164,7 +186,6 @@ public:
 	};
 	
 	ID3D11Debug *Debuger;
-
 	DEMO_APP(HINSTANCE hinst, WNDPROC proc);
 	static void UpdateKeyboardInput(UINT _key, bool _state, bool _toggle= false);
 	void UpdateInput();
@@ -210,7 +231,7 @@ void DEMO_APP::UpdateInput(){
 		mahKeys[KeyStateOFF.back()] = false;
 		KeyStateOFF.pop_back();
 	}
-
+	
 	float sDelt = (float)timeX.SmoothDelta();
 	if (mahKeys[VK_A])
 		newCamOffset.x -= speed * sDelt;
@@ -220,6 +241,10 @@ void DEMO_APP::UpdateInput(){
 		newCamOffset.z += speed * sDelt;
 	if (mahKeys[VK_S])
 		newCamOffset.z -= speed * sDelt;
+	if (mahKeys[VK_Q])
+		newCamOffset.y -= speed * sDelt;
+	if (mahKeys[VK_E])
+		newCamOffset.y += speed * sDelt;
 
 		XMMATRIX temp, INverted;
 		XMVECTOR Scale, Rot, Trans;
@@ -349,7 +374,7 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 	sampler_desc.AddressV = D3D11_TEXTURE_ADDRESS_WRAP;
 	sampler_desc.AddressW = D3D11_TEXTURE_ADDRESS_WRAP;
 	sampler_desc.MinLOD = 0;
-	sampler_desc.MaxLOD = 1;
+	sampler_desc.MaxLOD = Test_UV_Map_numlevels;
 	sampler_desc.ComparisonFunc = D3D11_COMPARISON_FUNC::D3D11_COMPARISON_GREATER_EQUAL;
 	
 	iDevice->CreateSamplerState(&sampler_desc, &SampleState);
@@ -385,6 +410,78 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 	Shaderview_desc.Texture2DArray.MostDetailedMip = 0;
 
 	iDevice->CreateShaderResourceView(tx_UVMap, &Shaderview_desc, &ShaderView);
+
+	CreateDDSTextureFromFile(iDevice, L"Assets\\Portal\\PortalSkybox.dds", (ID3D11Resource **)&tx_Skybox, &SkyboxView);	
+
+	VERTEX_3D realCube[8] = {
+			{ XMFLOAT3(-1, 1, -1), XMFLOAT2(0, 0) }, { XMFLOAT3(1, 1, -1), XMFLOAT2(1, 0) },
+			{ XMFLOAT3(-1, -1, -1), XMFLOAT2(0, 1) }, { XMFLOAT3(1, -1, -1), XMFLOAT2(1, 1) },
+			{ XMFLOAT3(1, 1, 1), XMFLOAT2(0, 0) }, { XMFLOAT3(-1, 1, 1), XMFLOAT2(1, 0) },
+			{ XMFLOAT3(1, -1, 1), XMFLOAT2(0, 1) },{ XMFLOAT3(-1, -1,-1), XMFLOAT2(1, 1) }
+	};
+
+	D3D11_BUFFER_DESC box_desc;
+	ZeroMemory(&box_desc, sizeof(D3D11_BUFFER_DESC));
+	box_desc.Usage = D3D11_USAGE::D3D11_USAGE_IMMUTABLE;
+	box_desc.BindFlags = D3D11_BIND_FLAG::D3D11_BIND_VERTEX_BUFFER;
+	box_desc.ByteWidth = sizeof(VERTEX_3D) * 8;
+
+	D3D11_SUBRESOURCE_DATA box_data;
+	ZeroMemory(&box_data, sizeof(D3D11_SUBRESOURCE_DATA));
+	box_data.pSysMem = realCube;
+
+	iDevice->CreateBuffer(&box_desc,&box_data,&vb_Box);
+
+	unsigned int indx = 0, one, two, three;
+	vector<unsigned int> box_indx;
+	for (unsigned int i = 0; i < 36; i+=4){
+		
+	}
+
+	box_indx.data();
+
+#if 0
+	D3D11_TEXTURE2D_DESC Skybox_Tx_desc;
+	ZeroMemory(&Skybox_Tx_desc, sizeof(D3D11_TEXTURE2D_DESC));
+	Skybox_Tx_desc.SampleDesc.Count = 1;
+	Skybox_Tx_desc.Format = DXGI_FORMAT::DXGI_FORMAT_B8G8R8A8_UNORM_SRGB;
+	Skybox_Tx_desc.BindFlags = D3D11_BIND_FLAG::D3D11_BIND_SHADER_RESOURCE;
+	Skybox_Tx_desc.MiscFlags = D3D11_RESOURCE_MISC_FLAG::D3D11_RESOURCE_MISC_TEXTURECUBE;
+	Skybox_Tx_desc.Usage = D3D11_USAGE::D3D11_USAGE_IMMUTABLE;
+	Skybox_Tx_desc.ArraySize = 6;
+	Skybox_Tx_desc.Height = 512;
+	Skybox_Tx_desc.Width = 512;
+	Skybox_Tx_desc.MipLevels = 10;
+
+	D3D11_SHADER_RESOURCE_VIEW_DESC Skybox_view_desc;
+	ZeroMemory(&Skybox_view_desc, sizeof(D3D11_SHADER_RESOURCE_VIEW_DESC));
+	Skybox_view_desc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURECUBE;
+	Skybox_view_desc.Format = DXGI_FORMAT::DXGI_FORMAT_B8G8R8A8_UNORM_SRGB;
+	Skybox_view_desc.TextureCube.MipLevels = 10;
+	Skybox_view_desc.TextureCube.MostDetailedMip = 0;
+
+
+	const unsigned int *Poteto[6];
+	Poteto[D3D11_TEXTURECUBE_FACE::D3D11_TEXTURECUBE_FACE_POSITIVE_X] = PORTAL_RT_PIXELS;
+	Poteto[D3D11_TEXTURECUBE_FACE::D3D11_TEXTURECUBE_FACE_NEGATIVE_X] = PORTAL_LF_PIXELS;
+	Poteto[D3D11_TEXTURECUBE_FACE::D3D11_TEXTURECUBE_FACE_POSITIVE_Y] = PORTAL_UP_PIXELS;
+	Poteto[D3D11_TEXTURECUBE_FACE::D3D11_TEXTURECUBE_FACE_NEGATIVE_Y] = PORTAL_DN_PIXELS;
+	Poteto[D3D11_TEXTURECUBE_FACE::D3D11_TEXTURECUBE_FACE_POSITIVE_Z] = PORTAL_FT_PIXELS;
+	Poteto[D3D11_TEXTURECUBE_FACE::D3D11_TEXTURECUBE_FACE_NEGATIVE_Z] = PORTAL_BK_PIXELS;
+	D3D11_SUBRESOURCE_DATA Skybox_Sub[10]; // 10 miplevels, 6 slices
+	
+	for (unsigned int i = 0; i < 10; ++i){
+		ZeroMemory(&Skybox_Sub[i], sizeof(Skybox_Sub[i]));
+		Skybox_Sub[i].pSysMem = &Poteto[i][portal_bk_leveloffsets[i]];
+		Skybox_Sub[i].SysMemPitch = (portal_bk_width >> i) * sizeof(unsigned int);
+		Skybox_Sub[i].SysMemSlicePitch = portal_bk_numpixels * sizeof(unsigned int);
+	}
+	iDevice->CreateTexture2D(&Skybox_Tx_desc, Skybox_Sub, &tx_Skybox);
+
+
+
+#endif // 0
+	
 #pragma endregion
 
 	ID3D11Resource *iResource;
@@ -437,7 +534,7 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 // <Mah 3D>
 
 #pragma region DefaultShape
-	unsigned int indx = 0;
+	indx = 0;
 
 	VERTEX_3D aTri[4] = { 
 			{ XMFLOAT3(0, 0.8f, 0), XMFLOAT2(0.5f, 0)},
@@ -556,8 +653,8 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 	view = rotation_trix * view;
 	view = XMMatrixInverse(nullptr, view);
 	XMStoreFloat4x4(&m_RTTView, view);
-	//toShader_RTT.view = XMMatrixTranspose(view);
-	toShader_RTT.view = XMLoadFloat4x4(&m_view);
+	toShader_RTT.view = XMMatrixTranspose(view);
+	//toShader_RTT.view = XMLoadFloat4x4(&m_view);
 
 
 	toShader_RTT.model = XMMatrixIdentity();
@@ -887,6 +984,12 @@ bool DEMO_APP::ShutDown()
 	tx_DepthStencil->Release();
 	iDepthStencilView->Release();
 
+	tx_Skybox->Release();
+	SkyboxView->Release();
+	
+
+	Debuger->ReportLiveDeviceObjects(D3D11_RLDO_DETAIL);
+	Debuger->Release();
 	DeffContext_Default->Release();
 	DeffContext_Model->Release();
 	//DeffCOntext_RTT->Release();
@@ -900,7 +1003,6 @@ bool DEMO_APP::ShutDown()
 
 	Debuger->ReportLiveDeviceObjects(D3D11_RLDO_DETAIL);
 	Debuger->Release();
-
 	UnregisterClass( L"DirectXApplication", application ); 
 	return true;
 }
@@ -1037,6 +1139,8 @@ LRESULT CALLBACK WndProc( HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam 
 				case VK_W: DEMO_APP::UpdateKeyboardInput(VK_W, true); break;
 				case VK_S: DEMO_APP::UpdateKeyboardInput(VK_S, true); break;
 				case VK_D: DEMO_APP::UpdateKeyboardInput(VK_D, true); break;
+				case VK_E: DEMO_APP::UpdateKeyboardInput(VK_E, true); break;
+				case VK_Q: DEMO_APP::UpdateKeyboardInput(VK_Q, true); break;
 				case VK_T: DEMO_APP::UpdateKeyboardInput(VK_T, true, true); break;
 				case VK_CONTROL: DEMO_APP::UpdateKeyboardInput(VK_CONTROL, true, true); break;
 				case VK_NUMPAD2: DEMO_APP::UpdateKeyboardInput(VK_NUMPAD2, true); break;
@@ -1054,6 +1158,8 @@ LRESULT CALLBACK WndProc( HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam 
 				case VK_W: DEMO_APP::UpdateKeyboardInput(VK_W, false); break;
 				case VK_S: DEMO_APP::UpdateKeyboardInput(VK_S, false); break;
 				case VK_D: DEMO_APP::UpdateKeyboardInput(VK_D, false); break;
+				case VK_E: DEMO_APP::UpdateKeyboardInput(VK_E, false); break;
+				case VK_Q: DEMO_APP::UpdateKeyboardInput(VK_Q, false); break;
 				case VK_T: DEMO_APP::UpdateKeyboardInput(VK_T, false, true); break;
 				case VK_CONTROL: DEMO_APP::UpdateKeyboardInput(VK_CONTROL, false, true); break;
 				case VK_NUMPAD2: DEMO_APP::UpdateKeyboardInput(VK_NUMPAD2, false); break;

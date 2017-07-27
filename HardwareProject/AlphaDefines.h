@@ -1,9 +1,9 @@
+// Virtual Key defines for Alphabet Letters (A-Z)
+
 
 #ifndef VK_A
 #define VK_A 0x41
-#endif // !VK_A
-
-//
+#endif 
 //0x42
 //B key
 //0x43
@@ -13,8 +13,10 @@
 #ifndef VK_D
 #define VK_D 0x44
 #endif
-//0x45
-//E key
+
+#ifndef VK_E
+#define VK_E 0x45
+#endif
 //0x46
 //F key
 //0x47
@@ -37,8 +39,9 @@
 //O key
 //0x50
 //P key
-//0x51
-//Q key
+#ifndef VK_Q
+#define VK_Q 0x51
+#endif
 //0x52
 //R key
 #ifndef VK_S
