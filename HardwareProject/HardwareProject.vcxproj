@@ -159,14 +159,29 @@
     </FxCompile>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="DDSTextureLoader.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="XTime.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="AlphaDefines.h" />
+    <ClInclude Include="Assets\Portal\portal_bk.h" />
+    <ClInclude Include="Assets\Portal\portal_dn.h" />
+    <ClInclude Include="Assets\Portal\portal_ft.h" />
+    <ClInclude Include="Assets\Portal\portal_lf.h" />
+    <ClInclude Include="Assets\Portal\portal_rt.h" />
+    <ClInclude Include="Assets\Portal\portal_up.h" />
     <ClInclude Include="Assets\Test_UV_Map.h" />
+    <ClInclude Include="DDSTextureLoader.h" />
     <ClInclude Include="XTime.h" />
   </ItemGroup>
   <ItemGroup>
+    <FxCompile Include="RTT_PixelShader.hlsl">
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Pixel</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Pixel</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Pixel</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Pixel</ShaderType>
+    </FxCompile>
     <FxCompile Include="SamplePixelShader.hlsl">
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Pixel</ShaderType>
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Pixel</ShaderType>
@@ -197,6 +212,12 @@
     <None Include="SampleVertexShader.csh" />
   </ItemGroup>
   <ItemGroup>
+    <Image Include="Assets\Portal\portal_bk.tga" />
+    <Image Include="Assets\Portal\portal_ft.tga" />
+    <Image Include="Assets\Portal\portal_lf.tga" />
+    <Image Include="Assets\Portal\portal_rt.tga" />
+    <Image Include="Assets\Portal\portal_up.tga" />
+    <Image Include="Assets\SkyboxOcean.dds" />
     <Image Include="Assets\Test_UV_Map.dds" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

@@ -1,14 +1,3 @@
-// CGS HW Project A "Line Land".
-// Author: L.Norri CD CGS, FullSail University
-
-// Introduction:
-// Welcome to the hardware project of the Computer Graphics Systems class.
-// This assignment is fully guided but still requires significant effort on your part. 
-// Future classes will demand the habits & foundation you develop right now!  
-// It is CRITICAL that you follow each and every step. ESPECIALLY THE READING!!!
-
-// TO BEGIN: Open the word document that acompanies this project and start from the top.
-
 //************************************************************
 //************ INCLUDES & DEFINES ****************************
 //************************************************************
@@ -17,6 +6,8 @@
 #include <ctime>
 #include "XTime.h"
 #include <vector>
+#include <thread>
+//#include "DDSTextureLoader.h"
 
 using namespace std;
 
@@ -25,13 +16,22 @@ using namespace std;
 #include <DirectXMath.h>
 using namespace DirectX;
 #include "Assets\Test_UV_Map.h"
+#include "Assets\Portal\portal_bk.h"
+#include "Assets\Portal\portal_dn.h"
+#include "Assets\Portal\portal_ft.h"
+#include "Assets\Portal\portal_lf.h"
+#include "Assets\Portal\portal_rt.h"
+#include "Assets\Portal\portal_up.h"
 
+#include "AlphaDefines.h"
 
 #include "Trivial_PS.csh"
 #include "Trivial_VS.csh"
-
 #include "SampleVertexShader.csh"
 #include "SamplePixelShader.csh"
+#include "RTT_PixelShader.csh"
+
+#include "DDSTextureLoader.h"
 
 #define BACKBUFFER_WIDTH	500
 #define BACKBUFFER_HEIGHT	500
@@ -44,7 +44,25 @@ using namespace DirectX;
 
 #define TEST_UV_MAP_PIXELS Test_UV_Map_pixels
 
+#define PORTAL_BK_PIXELS portal_bk_pixels
+
+#define PORTAL_DN_PIXELS portal_dn_pixels
+
+#define PORTAL_FT_PIXELS portal_ft_pixels
+
+#define PORTAL_LF_PIXELS portal_lf_pixels
+
+#define PORTAL_RT_PIXELS portal_rt_pixels
+
+#define PORTAL_UP_PIXELS portal_up_pixels
+
 #pragma endregion
+
+enum MouseBehave{ MIA, IDLE, MOVING };
+enum MouseStatus{ LOCKED, FREE };
+
+enum ShadersSettings{ DEFAULT, CUSTOM, PREVIOUS, TEMP};
+enum MahShaderType{ Pixel, Vertex, Geo };
 
 //************************************************************
 //************ SIMPLE WINDOWS APP CLASS **********************
@@ -56,11 +74,16 @@ class DEMO_APP
 	WNDPROC							appWndProc;
 	HWND							window;
 
-	XMFLOAT2 speed;
+	float speed = 4;
 	float turn;
 	XTime timeX;
 	unsigned int ObjIndxCount;
-
+	unsigned int qty_Box;
+	static bool mahKeys[256];
+	static std::vector<UINT> KeyStateON;
+	static std::vector<UINT> KeyStateOFF;
+	MouseStatus MStatus = MouseStatus::FREE;
+	
 	// Matrices
 	XMFLOAT4X4 m_view;
 	XMMATRIX m_Projection;
@@ -68,6 +91,15 @@ class DEMO_APP
 	XMFLOAT4X4 m_hoverCam;
 	XMFLOAT4X4 m_RTTView;
 	XMFLOAT4X4 m_RTTProjection;
+	XMFLOAT4X4 m_BoxWorld;
+
+	XMFLOAT4X4 Spinny;
+
+	// Vectors
+	XMFLOAT3 newCamOffset;
+	XMFLOAT3 Tracker_Up;
+	XMFLOAT3 Tracker_Pos;
+	XMFLOAT3 Tracker_Tgt;
 
 	// Buffers
 	ID3D11Buffer *vb_Cube;
@@ -75,6 +107,8 @@ class DEMO_APP
 	ID3D11Buffer *cBuff_perspective;
 	ID3D11Buffer *vb_Platform;
 	ID3D11Buffer *ib_Platform;
+	ID3D11Buffer *vb_Box;
+	ID3D11Buffer *ib_Box;
 
 	// Layouts
 	ID3D11InputLayout *lay_perspective;
@@ -83,21 +117,35 @@ class DEMO_APP
 	// Shaders
 	ID3D11VertexShader *VertSha_perspective;
 	ID3D11PixelShader *PixSha_perspective;
+	ID3D11PixelShader *PixSha_RTT;
+	
 
 	// textures
 	ID3D11Texture2D *tx_UVMap;
 	ID3D11Texture2D *tx_RTT;
+	ID3D11Texture2D *tx_DepthStencil;
+	ID3D11Texture2D *tx_Skybox;
 
 	// Views
 	ID3D11RenderTargetView *iRenderTarget;
 	ID3D11ShaderResourceView *ShaderView;
 	ID3D11RenderTargetView *RTT_RenderTarget;
 	D3D11_VIEWPORT hovCam_view;
-	D3D11_VIEWPORT RTT_View;
 	ID3D11ShaderResourceView *RTT_ShaderView;
+	ID3D11DepthStencilView *iDepthStencilView;
+	ID3D11ShaderResourceView *SkyboxView;
 
 	// Pending...
 	ID3D11SamplerState *SampleState;
+	ID3D11DeviceContext *DeffContext_Default;
+	ID3D11DeviceContext *DeffCOntext_RTT;
+	ID3D11DeviceContext *DeffContext_Model;
+	ID3D11DeviceContext *DeffContext_Zero;
+
+	ID3D11CommandList *CmdList_Default;
+	ID3D11CommandList *CmdList_RTT;
+	ID3D11CommandList *CmdList_Model;
+	ID3D11CommandList *CmdList_Zero;
 
 	ID3D11Device *iDevice;
 	ID3D11DeviceContext *iDeviceContext;
@@ -138,11 +186,123 @@ public:
 		XMFLOAT3 norm;
 	};
 	
+	ID3D11Debug *Debuger;
 	DEMO_APP(HINSTANCE hinst, WNDPROC proc);
+	static void UpdateKeyboardInput(UINT _key, bool _state, bool _toggle= false);
+	void UpdateInput();
 	bool Run();
 	bool ShutDown();
 	bool LoadObjFile(const char *_filename, std::vector<VERTEX_OBJMODEL> &_forVB);
+	void CreateObj();
+	bool LoadDefault();
+	bool LoadRTT();
+
+	void RenderDefault( ID3D11DeviceContext *iDeviceContext , XMFLOAT3 _Offset);
+	bool RenderRTT();
+	bool RenderOBJ();
+
 };
+
+std::vector<UINT> DEMO_APP::KeyStateON;
+std::vector<UINT> DEMO_APP::KeyStateOFF;
+bool DEMO_APP::mahKeys[256] = {};
+
+void DEMO_APP::UpdateKeyboardInput(UINT _key, bool _state, bool _toggle){
+	if (_state && _toggle){
+		return;
+	}
+	if (!_toggle){
+		if (_state)
+			KeyStateON.push_back(_key);
+		else
+			KeyStateOFF.push_back(_key);
+	}
+	// Toggle
+	else{
+		mahKeys[_key] ? KeyStateOFF.push_back(_key) : KeyStateON.push_back(_key);
+	}
+}
+
+void DEMO_APP::UpdateInput(){
+	while (!KeyStateON.empty())
+	{
+		mahKeys[KeyStateON.back()] = true;
+		KeyStateON.pop_back();
+	}
+	while (!KeyStateOFF.empty()){
+		mahKeys[KeyStateOFF.back()] = false;
+		KeyStateOFF.pop_back();
+	}
+	
+	float sDelt = (float)timeX.SmoothDelta();
+	if (mahKeys[VK_A])
+		newCamOffset.x -= speed * sDelt;
+	if (mahKeys[VK_D])
+		newCamOffset.x += speed * sDelt;
+	if (mahKeys[VK_W])
+		newCamOffset.z += speed * sDelt;
+	if (mahKeys[VK_S])
+		newCamOffset.z -= speed * sDelt;
+	if (mahKeys[VK_Q])
+		newCamOffset.y -= speed * sDelt;
+	if (mahKeys[VK_E])
+		newCamOffset.y += speed * sDelt;
+
+		XMMATRIX temp, INverted;
+		XMVECTOR Scale, Rot, Trans;
+
+	if (!mahKeys[VK_T]){
+		temp = XMMatrixIdentity();
+
+		if (mahKeys[VK_NUMPAD4])
+			temp = XMMatrixRotationY(XMConvertToRadians(-90 * sDelt)) *temp;
+		if (mahKeys[VK_NUMPAD6])
+			temp = XMMatrixRotationY(XMConvertToRadians(90 * sDelt)) *temp;
+
+		INverted = XMMatrixInverse(NULL, XMLoadFloat4x4(&m_view));
+		XMMatrixDecompose(&Scale, &Rot, &Trans, INverted);
+		temp = XMMatrixScalingFromVector(Scale) * XMMatrixRotationQuaternion(Rot) * temp;
+		temp = temp * XMMatrixTranslationFromVector(Trans);
+
+		if (mahKeys[VK_NUMPAD8])
+			temp = XMMatrixRotationX(XMConvertToRadians(-90 * sDelt)) * temp;
+		if (mahKeys[VK_NUMPAD2])
+			temp = XMMatrixRotationX(XMConvertToRadians(90 * sDelt)) * temp;
+
+		XMFLOAT4 MAX(1, 1, 1, 1), MIN(-1, 0, -1, 0);
+		temp.r[1] = XMVectorClamp(temp.r[1], XMLoadFloat4(&MIN), XMLoadFloat4(&MAX));
+		XMStoreFloat4x4(&Spinny, temp);
+
+		temp = XMMatrixIdentity();
+		temp = temp * XMMatrixTranslation(newCamOffset.x, newCamOffset.y, newCamOffset.z);
+		temp = temp * XMLoadFloat4x4(&Spinny);
+		XMStoreFloat4x4(&m_view, XMMatrixInverse(NULL, temp));
+		//XMStoreFloat4x4(&m_BoxWorld, XMMatrixTranslationFromVector(Trans));
+	}
+	else{
+		XMMATRIX temp = XMMatrixIdentity();
+		INverted = XMMatrixInverse(NULL, XMLoadFloat4x4(&m_view));
+		XMMatrixDecompose(&Scale, &Rot, &Trans, INverted);
+		XMVECTOR aVector = Trans;
+		XMMatrixDecompose(&Scale, &Rot, &Trans, XMLoadFloat4x4(& m_CubeWorld));
+		XMStoreFloat3(&Tracker_Tgt, Trans);
+		temp = XMMatrixLookAtLH(aVector, XMLoadFloat3(&Tracker_Tgt), XMLoadFloat3(&Tracker_Up));
+		temp = temp * XMMatrixInverse(NULL, XMMatrixTranslation(newCamOffset.x, newCamOffset.y, newCamOffset.z));
+		XMStoreFloat4x4(&m_view, temp);
+	}
+
+	ZeroMemory(&newCamOffset, sizeof(newCamOffset));
+
+	if (MStatus == MouseStatus::FREE && mahKeys[VK_CONTROL]){
+		ShowCursor(false);
+		MStatus = MouseStatus::LOCKED;
+	}
+	if (MStatus == MouseStatus::LOCKED && !mahKeys[VK_CONTROL]){
+		ShowCursor(true);
+		MStatus = MouseStatus::FREE;
+	}
+
+}
 
 //************************************************************
 //************ CREATION OF OBJECTS & RESOURCES ***************
@@ -177,6 +337,8 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 	//********************* END WARNING ************************//
 
 
+
+
 	DXGI_SWAP_CHAIN_DESC chainDesc;
 	ZeroMemory(&chainDesc, sizeof(DXGI_SWAP_CHAIN_DESC));
 	chainDesc.BufferCount = 1;
@@ -203,6 +365,15 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 		&FeatureLevelsRequested, numLevelsRequested, D3D11_SDK_VERSION, &chainDesc, &swapChain, 
 		&iDevice, &FeatureLevelsSupported, &iDeviceContext);
 #endif
+// <THREAD MODEL LOADING/>
+	thread objloader(&DEMO_APP::CreateObj, this);
+// <THREAD MODEL LOADING/>
+
+	iDevice->CreateDeferredContext(NULL, &DeffContext_Default);
+	iDevice->CreateDeferredContext(NULL, &DeffContext_Zero);
+	iDevice->CreateDeferredContext(NULL, &DeffContext_Model);
+
+	iDevice->QueryInterface(IID_PPV_ARGS(&Debuger));
 
 	D3D11_SAMPLER_DESC sampler_desc;
 	ZeroMemory(&sampler_desc, sizeof(D3D11_SAMPLER_DESC));
@@ -216,6 +387,7 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 	
 	iDevice->CreateSamplerState(&sampler_desc, &SampleState);
 	
+#pragma region Load
 	D3D11_TEXTURE2D_DESC tx_UV_Desc;
 	ZeroMemory(&tx_UV_Desc, sizeof(D3D11_TEXTURE2D_DESC));
 	tx_UV_Desc.Usage = D3D11_USAGE::D3D11_USAGE_IMMUTABLE;
@@ -247,10 +419,117 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 
 	iDevice->CreateShaderResourceView(tx_UVMap, &Shaderview_desc, &ShaderView);
 
+	CreateDDSTextureFromFile(iDevice, L"Assets\\Portal\\PortalSkybox.dds", (ID3D11Resource **)&tx_Skybox, &SkyboxView);	
+
+	XMStoreFloat4x4(&m_BoxWorld, XMMatrixIdentity());
+	VERTEX_3D realCube[8] = {
+			{ XMFLOAT3(-1, 1, -1), XMFLOAT2(0, 0) }, { XMFLOAT3(1, 1, -1), XMFLOAT2(1, 0) },
+			{ XMFLOAT3(-1, -1, -1), XMFLOAT2(0, 1) }, { XMFLOAT3(1, -1, -1), XMFLOAT2(1, 1) },
+			{ XMFLOAT3(1, 1, 1), XMFLOAT2(0, 0) }, { XMFLOAT3(-1, 1, 1), XMFLOAT2(1, 0) },
+			{ XMFLOAT3(1, -1, 1), XMFLOAT2(0, 1) },{ XMFLOAT3(-1, -1,-1), XMFLOAT2(1, 1) }
+	};
+
+	D3D11_BUFFER_DESC box_desc;
+	ZeroMemory(&box_desc, sizeof(D3D11_BUFFER_DESC));
+	box_desc.Usage = D3D11_USAGE::D3D11_USAGE_IMMUTABLE;
+	box_desc.BindFlags = D3D11_BIND_FLAG::D3D11_BIND_VERTEX_BUFFER;
+	box_desc.ByteWidth = sizeof(VERTEX_3D) * 8;
+
+	D3D11_SUBRESOURCE_DATA box_data;
+	ZeroMemory(&box_data, sizeof(D3D11_SUBRESOURCE_DATA));
+	box_data.pSysMem = realCube;
+
+	iDevice->CreateBuffer(&box_desc,&box_data,&vb_Box);
+
+	unsigned int indx = 0, one, two, three;
+	vector<unsigned int> box_indx;
+
+	// Front Face 
+	box_indx.push_back(1);
+	box_indx.push_back(0);
+	box_indx.push_back(2);
+	box_indx.push_back(2);
+	box_indx.push_back(3);
+	box_indx.push_back(1);
+	// Back Face
+	box_indx.push_back(5);
+	box_indx.push_back(4);
+	box_indx.push_back(6);
+	box_indx.push_back(6);
+	box_indx.push_back(7);
+	box_indx.push_back(5);
+	// Right
+	box_indx.push_back(4);
+	box_indx.push_back(1);
+	box_indx.push_back(3);
+	box_indx.push_back(3);
+	box_indx.push_back(6);
+	box_indx.push_back(4);
+	// Left
+	box_indx.push_back(0);
+	box_indx.push_back(5);
+	box_indx.push_back(7);
+	box_indx.push_back(7);
+	box_indx.push_back(2);
+	box_indx.push_back(0);
+	// Top
+	box_indx.push_back(4);
+	box_indx.push_back(5);
+	box_indx.push_back(0);
+	box_indx.push_back(0);
+	box_indx.push_back(1);
+	box_indx.push_back(4);
+	// Bottom
+	box_indx.push_back(3);
+	box_indx.push_back(2);
+	box_indx.push_back(7);
+	box_indx.push_back(7);
+	box_indx.push_back(6);
+	box_indx.push_back(3);
+
+	qty_Box = box_indx.size();
+
+
+	D3D11_BUFFER_DESC indx_box_desc;
+	ZeroMemory(&indx_box_desc, sizeof(D3D11_BUFFER_DESC));
+	indx_box_desc.Usage = D3D11_USAGE::D3D11_USAGE_DEFAULT;
+	indx_box_desc.BindFlags = D3D11_BIND_FLAG::D3D11_BIND_INDEX_BUFFER;
+	indx_box_desc.ByteWidth = sizeof(unsigned int) * qty_Box;
+
+	D3D11_SUBRESOURCE_DATA indx_sub_box;
+	ZeroMemory(&indx_sub_box, sizeof(D3D11_SUBRESOURCE_DATA));
+	indx_sub_box = box_data;
+
+	iDevice->CreateBuffer(&indx_box_desc, &indx_sub_box, &ib_Box);
+	Debuger->ReportLiveDeviceObjects(D3D11_RLDO_DETAIL);
+
+	
+#pragma endregion
+
 	ID3D11Resource *iResource;
-	ZeroMemory(&iResource, sizeof(ID3D10Resource));
+	ZeroMemory(&iResource, sizeof(ID3D11Resource));
 	swapChain->GetBuffer(0, __uuidof(iResource), reinterpret_cast<void**>(&iResource));
 	iDevice->CreateRenderTargetView(iResource, NULL, &iRenderTarget);
+	iResource->Release(); 
+
+	D3D11_TEXTURE2D_DESC Stencil_Resource_desc;
+	ZeroMemory(&Stencil_Resource_desc, sizeof(D3D11_TEXTURE2D_DESC));
+	Stencil_Resource_desc.BindFlags = D3D11_BIND_FLAG::D3D11_BIND_DEPTH_STENCIL;
+	Stencil_Resource_desc.Usage = D3D11_USAGE::D3D11_USAGE_DEFAULT;
+	Stencil_Resource_desc.Format = DXGI_FORMAT::DXGI_FORMAT_D32_FLOAT;
+	Stencil_Resource_desc.Height = BACKBUFFER_HEIGHT;
+	Stencil_Resource_desc.Width = BACKBUFFER_WIDTH;
+	Stencil_Resource_desc.ArraySize = 1;
+	Stencil_Resource_desc.SampleDesc.Count = 1;
+
+	iDevice->CreateTexture2D(&Stencil_Resource_desc, NULL, &tx_DepthStencil);
+
+	D3D11_DEPTH_STENCIL_VIEW_DESC STENCIL_DESC;
+	ZeroMemory(&STENCIL_DESC, sizeof(D3D11_DEPTH_STENCIL_VIEW_DESC));
+	STENCIL_DESC.ViewDimension = D3D11_DSV_DIMENSION_TEXTURE2D;
+	STENCIL_DESC.Format = DXGI_FORMAT::DXGI_FORMAT_D32_FLOAT;
+
+	iDevice->CreateDepthStencilView(tx_DepthStencil, &STENCIL_DESC, &iDepthStencilView);
 
 	swapChain->GetDesc(&chainDesc);
 	ZeroMemory(&viewPort, sizeof(D3D11_VIEWPORT));
@@ -259,10 +538,7 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 	viewPort.MaxDepth = 1.0f;
 	viewPort.MinDepth = 0.0f;
 
-
-
-	iResource->Release(); 
-
+#pragma region extraView
 
 // <Mah hovercam>
 	ZeroMemory(&hovCam_view, sizeof(hovCam_view));
@@ -275,8 +551,12 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 
 // <mah hovercam/>
 
+#pragma endregion
+
 // <Mah 3D>
-	unsigned int indx = 0;
+
+#pragma region DefaultShape
+	indx = 0;
 
 	VERTEX_3D aTri[4] = { 
 			{ XMFLOAT3(0, 0.8f, 0), XMFLOAT2(0.5f, 0)},
@@ -327,6 +607,13 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 	iDevice->CreateBuffer(&indx_Cube_desc, &indx_subRes_cube, &ib_Cube);
 
 	XMStoreFloat4x4(&m_CubeWorld,XMMatrixIdentity());
+#pragma endregion
+
+#pragma region DefaultViewProjection
+
+	Tracker_Up = XMFLOAT3(0, 1, 0);
+	Tracker_Pos = XMFLOAT3(0, 0, 0);
+	Tracker_Tgt = XMFLOAT3(0, 0, 1);
 
 	m_view = XMFLOAT4X4(
 		1.0f, 0.0f, 0.0f, 0.0f,
@@ -339,7 +626,7 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 	rotation_trix = XMMatrixRotationX(XMConvertToRadians(18));
 	view = XMMatrixMultiply(view, rotation_trix);
 	view = XMMatrixInverse(nullptr, view);
-	view = XMMatrixTranspose(view);
+	toShader_perspective.view = XMMatrixTranspose( view);	
 	XMStoreFloat4x4(&m_view, view);
 
 	// zNear = 0.1;
@@ -349,13 +636,15 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 	m_Projection = XMMatrixPerspectiveFovLH(XMConvertToRadians(90.0f), aspect, 0.1f, 1000.0f);
 	toShader_perspective.projection = XMMatrixTranspose(m_Projection);
 
-	toShader_perspective.view = XMLoadFloat4x4(&m_view);	
+
+#pragma endregion
 
 	XMMATRIX model = XMLoadFloat4x4(&m_CubeWorld);
 	model = XMMatrixTranslation(0.7f, 0, 0);
 	toShader_perspective.model = XMMatrixTranspose(model);
-	XMStoreFloat4x4(&m_CubeWorld, model);
+	XMStoreFloat4x4(&m_CubeWorld, model); 
 
+#pragma region extraView
 // <mah hovercam>
 	aspect = HOVERCAM_WITDH / HOVERCAM_HEIGHT;
 	toshader_hoverCam.projection = XMMatrixTranspose(XMMatrixPerspectiveFovLH(XMConvertToRadians(90.0f), aspect, 0.1f, 1000.0f));
@@ -371,7 +660,9 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 	XMStoreFloat4x4(&m_hoverCam, view);
 	
 // <mah hovercam/>
+#pragma endregion
 
+#pragma region RTTview
 // <RTT>
 	aspect = BACKBUFFER_WIDTH / BACKBUFFER_HEIGHT;
 	XMMATRIX projection = XMMatrixPerspectiveFovLH(XMConvertToDegrees(90.0f), aspect, 0.1f, 1000.0f);
@@ -379,19 +670,21 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 	XMStoreFloat4x4(&m_RTTProjection, projection);
 
 	view = XMMatrixIdentity();
-	view = XMMatrixTranslation(0.0f, 1.5f, -1.7f);
+	view = XMMatrixTranslation(0.0f, 0.0f, -1.5f);
 	rotation_trix = XMMatrixRotationX(XMConvertToRadians(18));
-	view = view * rotation_trix;
+	view = rotation_trix * view;
 	view = XMMatrixInverse(nullptr, view);
 	XMStoreFloat4x4(&m_RTTView, view);
 	toShader_RTT.view = XMMatrixTranspose(view);
+	//toShader_RTT.view = XMLoadFloat4x4(&m_view);
+
 
 	toShader_RTT.model = XMMatrixIdentity();
 
 	D3D11_TEXTURE2D_DESC tempRTT_Desc;
 	ZeroMemory(&tempRTT_Desc, sizeof(D3D11_TEXTURE2D_DESC));
 	tempRTT_Desc.BindFlags = D3D11_BIND_FLAG::D3D11_BIND_RENDER_TARGET | D3D11_BIND_FLAG::D3D11_BIND_SHADER_RESOURCE;
-	tempRTT_Desc.Format = DXGI_FORMAT::DXGI_FORMAT_B8G8R8A8_UNORM_SRGB;
+	tempRTT_Desc.Format = DXGI_FORMAT::DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
 	tempRTT_Desc.MiscFlags = D3D11_RESOURCE_MISC_FLAG::D3D11_RESOURCE_MISC_GENERATE_MIPS;
 	tempRTT_Desc.ArraySize = 1;
 	tempRTT_Desc.Height = BACKBUFFER_HEIGHT;
@@ -403,7 +696,7 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 
 	D3D11_RENDER_TARGET_VIEW_DESC render_desc;
 	ZeroMemory(&render_desc, sizeof(render_desc));
-	render_desc.Format = DXGI_FORMAT::DXGI_FORMAT_B8G8R8A8_UNORM_SRGB;
+	render_desc.Format = DXGI_FORMAT::DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
 	render_desc.ViewDimension = D3D11_RTV_DIMENSION::D3D11_RTV_DIMENSION_TEXTURE2D;
 	render_desc.Texture2D.MipSlice = 0;
 
@@ -411,23 +704,20 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 
 	D3D11_SHADER_RESOURCE_VIEW_DESC RTTShaderview_desc;
 	ZeroMemory(&RTTShaderview_desc, sizeof(RTTShaderview_desc));
-	RTTShaderview_desc.Format = DXGI_FORMAT::DXGI_FORMAT_B8G8R8A8_UNORM_SRGB;
+	RTTShaderview_desc.Format = DXGI_FORMAT::DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
 	RTTShaderview_desc.ViewDimension = D3D11_SRV_DIMENSION::D3D11_SRV_DIMENSION_TEXTURE2D;
 	RTTShaderview_desc.Texture2D.MipLevels = 1;
 	RTTShaderview_desc.Texture2D.MostDetailedMip = 0;
 
 	iDevice->CreateShaderResourceView(tx_RTT, &RTTShaderview_desc, &RTT_ShaderView);
 
-	ZeroMemory(&RTT_View, sizeof(D3D11_VIEWPORT));
-	RTT_View.Height = static_cast<FLOAT>(chainDesc.BufferDesc.Height);
-	RTT_View.Width = static_cast<FLOAT>(chainDesc.BufferDesc.Width);
-	RTT_View.TopLeftX = RTT_View.Width + 1;
-	RTT_View.MaxDepth = 1.0f;
-	RTT_View.MinDepth = 0.0f;
+	iDevice->CreatePixelShader(&RTT_PixelShader, sizeof(RTT_PixelShader), NULL, &PixSha_RTT);
 
 	
 // <RTT/>
+#pragma endregion
 
+#pragma region Default
 	iDevice->CreateVertexShader(&SampleVertexShader, sizeof(SampleVertexShader), NULL, &VertSha_perspective);
 	iDevice->CreatePixelShader(&SamplePixelShader, sizeof(SamplePixelShader), NULL, &PixSha_perspective);
 
@@ -446,9 +736,12 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 	iDevice->CreateBuffer(&cb_3d, NULL, &cBuff_perspective);
 
 // <mah 3D />
+#pragma endregion
 
 
+#pragma region Load
 // <Prototype Loader>
+#if 0
 	std::vector<VERTEX_OBJMODEL> vObjModel;
 	LoadObjFile("Assets\\BasicPlatform\\wall.obj", vObjModel);
 
@@ -467,11 +760,11 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 
 	std::vector<unsigned int> modelIndices;
 	unsigned int Fst, Mid, Trd;
-	for (unsigned int i = 0; i < vObjModel.size(); i+=4){
+	for (unsigned int i = 0; i < vObjModel.size(); i += 4){
 		Fst = i;
 		Mid = i + 1;
 		Trd = i + 2;
-		
+
 		modelIndices.push_back(Fst);
 		modelIndices.push_back(Mid);
 		modelIndices.push_back(Trd);
@@ -505,10 +798,16 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 
 	iDevice->CreateInputLayout(layout_desc, 3, &SampleVertexShader, sizeof(SampleVertexShader), &lay_OBJModel);
 
+#endif // 0
+
+	objloader.join();
+
 // <Prototype Loader/>
+#pragma endregion
 
 	turn = 12.0f;
-	timeX.Throttle(60);
+	timeX.Throttle(2);
+	ZeroMemory(&newCamOffset, sizeof(newCamOffset));
 
 }
 
@@ -519,8 +818,10 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 bool DEMO_APP::Run()
 {
 	timeX.Signal();
+	UpdateInput();
 
-	iDeviceContext->OMSetRenderTargets(1, &iRenderTarget, NULL);
+	iDeviceContext->ClearDepthStencilView(iDepthStencilView,D3D11_CLEAR_DEPTH,1,NULL);
+	iDeviceContext->OMSetRenderTargets(1, &iRenderTarget, iDepthStencilView);
 
 	FLOAT DarkBlue[] = { 0.0f, 0.0f, 0.45f, 1.0f };
 	FLOAT Black[] = { 0.0f, 0.0f, 0.0f, 1.0f };
@@ -530,9 +831,11 @@ bool DEMO_APP::Run()
 
 // <Mah 3d>
 	XMMATRIX cubeWorld= XMLoadFloat4x4(&m_CubeWorld);
-	cubeWorld = XMMatrixRotationX(-XMConvertToRadians(turn*timeX.Delta()))*cubeWorld;
+	cubeWorld = XMMatrixRotationZ(-XMConvertToRadians(turn*timeX.Delta()))*cubeWorld;
 	toShader_perspective.model = XMMatrixTranspose(cubeWorld);
 	XMStoreFloat4x4(&m_CubeWorld, cubeWorld);
+
+	toShader_perspective.view =XMMatrixTranspose( XMLoadFloat4x4(&m_view)) ;
 
 	D3D11_MAPPED_SUBRESOURCE map_cube;
 	ZeroMemory(&map_cube, sizeof(D3D11_MAPPED_SUBRESOURCE));
@@ -543,12 +846,10 @@ bool DEMO_APP::Run()
 
 	UINT _startSlot = 0;
 	UINT _numBuffs = 1;
-	UINT _strides[D3D11_IA_VERTEX_INPUT_RESOURCE_SLOT_COUNT];
-	UINT _offSets[D3D11_IA_VERTEX_INPUT_RESOURCE_SLOT_COUNT];
-	ZeroMemory(_strides, sizeof(_strides));
-	ZeroMemory(_offSets, sizeof(_offSets));
-	_strides[0] = static_cast<UINT>(sizeof(VERTEX_3D));
-	iDeviceContext->IASetVertexBuffers(0, 1, &vb_Cube, _strides, _offSets);
+	UINT _strides = 0;
+	UINT _offSets = 0;
+	_strides = static_cast<UINT>(sizeof(VERTEX_3D));
+	iDeviceContext->IASetVertexBuffers(0, 1, &vb_Cube, &_strides, &_offSets);
 
 	iDeviceContext->IASetIndexBuffer(ib_Cube, DXGI_FORMAT::DXGI_FORMAT_R32_UINT, 0);
 
@@ -562,15 +863,38 @@ bool DEMO_APP::Run()
 	iDeviceContext->IASetInputLayout(lay_perspective);
 	iDeviceContext->DrawIndexed(12, 0, 0);
 
-
 // <Mah 3d/>
 
+	thread step1(&DEMO_APP::RenderDefault,this, DeffContext_Default, XMFLOAT3(0, 1, 0));
+
+	thread step2(&DEMO_APP::RenderDefault,this, DeffContext_Zero, XMFLOAT3(0, 2, 0));
+
+	thread step3(&DEMO_APP::RenderDefault,this, DeffContext_Model, XMFLOAT3(0, 3, 0));
+
+// Skybox
+	toShader_perspective.model = XMMatrixTranspose(XMLoadFloat4x4(&m_BoxWorld));
+	ZeroMemory(&map_cube, sizeof(D3D11_MAPPED_SUBRESOURCE));
+	iDeviceContext->Map(cBuff_perspective, 0, D3D11_MAP::D3D11_MAP_WRITE_DISCARD, NULL, &map_cube);
+	memcpy(map_cube.pData, &toShader_perspective, sizeof(toShader_perspective));
+	iDeviceContext->Unmap(cBuff_perspective, 0);
+	
+	iDeviceContext->IAGetVertexBuffers(0, 1, &vb_Box, &_strides, &_offSets);
+	iDeviceContext->IASetIndexBuffer(ib_Box, DXGI_FORMAT_R32_UINT, 0);
+
+	iDeviceContext->DrawIndexed(qty_Box, 0, 0);
+// Skybox end
+
+
 // <RTT>
-	iDeviceContext->OMSetRenderTargets(1, &RTT_RenderTarget, NULL);
 	iDeviceContext->ClearRenderTargetView(RTT_RenderTarget, Black);
+	iDeviceContext->OMSetRenderTargets(1, &RTT_RenderTarget, NULL);
 	cubeWorld = XMLoadFloat4x4(&m_CubeWorld);
 	toShader_RTT.model = XMMatrixTranspose(cubeWorld);
 
+	_strides = static_cast<UINT>(sizeof(VERTEX_3D));
+	iDeviceContext->IASetVertexBuffers(0, 1, &vb_Cube, &_strides, &_offSets);
+	iDeviceContext->IASetIndexBuffer(ib_Cube, DXGI_FORMAT::DXGI_FORMAT_R32_UINT, 0);
+	
 	ZeroMemory(&map_cube, sizeof(D3D11_MAPPED_SUBRESOURCE));
 	iDeviceContext->Map(cBuff_perspective, 0, D3D11_MAP::D3D11_MAP_WRITE_DISCARD, NULL, &map_cube);
 	memcpy(map_cube.pData, &toShader_RTT, sizeof(toShader_RTT));
@@ -578,8 +902,8 @@ bool DEMO_APP::Run()
 	iDeviceContext->VSSetConstantBuffers(0, 1, &cBuff_perspective);
 
 	iDeviceContext->DrawIndexed(12, 0, 0);
+	iDeviceContext->OMSetRenderTargets(1, &iRenderTarget, iDepthStencilView);
 
-	iDeviceContext->OMSetRenderTargets(1, &iRenderTarget, NULL);
 	iDeviceContext->PSSetShaderResources(0, 1, &RTT_ShaderView);
 
 // <RTT/>
@@ -599,15 +923,23 @@ bool DEMO_APP::Run()
 	UINT strides = sizeof(VERTEX_OBJMODEL);
 	UINT offsets = 0;
 	iDeviceContext->IASetVertexBuffers(0, 1, &vb_Platform, &strides, &offsets);
-
 	iDeviceContext->IASetIndexBuffer(ib_Platform, DXGI_FORMAT_R32_UINT, 0);
 
 	iDeviceContext->IASetInputLayout(lay_OBJModel);
+
+// <RTT>
+	iDeviceContext->PSSetShader(PixSha_RTT, 0, 0);
+
 	iDeviceContext->DrawIndexed(ObjIndxCount, 0, 0);
 // <Model loader/>
 
+	iDeviceContext->PSSetShader(PixSha_perspective,0,0);
+// <RTT/>
+
+
 
 // <MultiViewport>
+
 	iDeviceContext->PSSetShaderResources(0, 1, &ShaderView);
 	XMMATRIX Hover = XMLoadFloat4x4(&m_hoverCam);
 	Hover = XMMatrixRotationY(XMConvertToRadians(turn*timeX.Delta() * -3.2f)) * Hover;
@@ -621,15 +953,40 @@ bool DEMO_APP::Run()
 	memcpy(map_cube.pData, &toshader_hoverCam, sizeof(toshader_hoverCam));
 	iDeviceContext->Unmap(cBuff_perspective, 0);
 	iDeviceContext->VSSetConstantBuffers(0, 1, &cBuff_perspective);
+	_strides = static_cast<UINT>(sizeof(VERTEX_3D));
 
-	iDeviceContext->IASetVertexBuffers(0, 1, &vb_Cube, _strides, _offSets);
+	iDeviceContext->IASetVertexBuffers(0, 1, &vb_Cube, &_strides, &_offSets);
 	iDeviceContext->IASetIndexBuffer(ib_Cube, DXGI_FORMAT::DXGI_FORMAT_R32_UINT, 0);
 	iDeviceContext->IASetInputLayout(lay_perspective);
 	iDeviceContext->RSSetViewports(1, &hovCam_view);
 	iDeviceContext->DrawIndexed(12, 0, 0);
 // <MultiViewport/>
 
+	step1.join();
+	step2.join();
+	step3.join();
+
+	ID3D11CommandList *CmdList;
+	ID3D11CommandList *CmdList_Zero000;
+	ID3D11CommandList *CmdList_Model000;
+
+
+	DeffContext_Default->FinishCommandList(false, &CmdList);
+	DeffContext_Model->FinishCommandList(false, &CmdList_Model000);
+	DeffContext_Zero->FinishCommandList(false, &CmdList_Zero000);
+	
+	iDeviceContext->ExecuteCommandList(CmdList, false);
+	iDeviceContext->ExecuteCommandList(CmdList_Model000, false);
+	iDeviceContext->ExecuteCommandList(CmdList_Zero000, false);
+
+	iDeviceContext->Flush();
+
+	CmdList->Release();
+	CmdList_Model000->Release();
+	CmdList_Zero000->Release();
+
 	swapChain->Present(0, 0);
+
 
 	return true; 
 }
@@ -664,9 +1021,62 @@ bool DEMO_APP::ShutDown()
 	RTT_RenderTarget->Release();
 	RTT_ShaderView->Release();
 	tx_RTT->Release();
+	PixSha_RTT->Release();
 
+	tx_DepthStencil->Release();
+	iDepthStencilView->Release();
+
+	tx_Skybox->Release();
+	SkyboxView->Release();
+	
+	vb_Box->Release();
+	ib_Box->Release();
+	DeffContext_Default->Release();
+	DeffContext_Model->Release();
+	DeffContext_Zero->Release();
+	OutputDebugStringW(L"\n\n\n poteto \n\n\n");
+
+
+	Debuger->ReportLiveDeviceObjects(D3D11_RLDO_DETAIL);
+	Debuger->Release();
 	UnregisterClass( L"DirectXApplication", application ); 
 	return true;
+}
+
+void DEMO_APP::RenderDefault( ID3D11DeviceContext *iDeviceContext , XMFLOAT3 _Offset){
+
+
+	iDeviceContext->OMSetRenderTargets(1, &iRenderTarget, iDepthStencilView);
+	iDeviceContext->RSSetViewports(1, &viewPort);
+
+	XMMATRIX cubeWorld = XMLoadFloat4x4(&m_CubeWorld);
+	cubeWorld = XMMatrixRotationZ(-XMConvertToRadians(turn*timeX.Delta()))*cubeWorld;
+	//XMStoreFloat4x4(&m_CubeWorld, cubeWorld);
+	cubeWorld = cubeWorld * XMMatrixTranslationFromVector(XMLoadFloat3(&_Offset));
+	toShader_perspective.model = XMMatrixTranspose(cubeWorld);
+	toShader_perspective.view = XMMatrixTranspose(XMLoadFloat4x4(&m_view));
+
+	D3D11_MAPPED_SUBRESOURCE map_cube;
+	ZeroMemory(&map_cube, sizeof(D3D11_MAPPED_SUBRESOURCE));
+	iDeviceContext->Map(cBuff_perspective, 0, D3D11_MAP::D3D11_MAP_WRITE_DISCARD, NULL, &map_cube);
+	memcpy(map_cube.pData, &toShader_perspective, sizeof(toShader_perspective));
+	iDeviceContext->Unmap(cBuff_perspective, 0);
+	iDeviceContext->VSSetConstantBuffers(0, 1, &cBuff_perspective);
+
+	UINT _startSlot = 0;
+	UINT _numBuffs = 1;
+	UINT _strides = static_cast<UINT>(sizeof(VERTEX_3D));
+	UINT _offSets = 0;
+	iDeviceContext->IASetVertexBuffers(_startSlot, _numBuffs, &vb_Cube, &_strides, &_offSets);
+	iDeviceContext->IASetIndexBuffer(ib_Cube, DXGI_FORMAT::DXGI_FORMAT_R32_UINT, 0);
+	iDeviceContext->PSSetSamplers(0, 1, &SampleState);
+	iDeviceContext->PSSetShaderResources(0, 1, &ShaderView);
+	iDeviceContext->VSSetShader(VertSha_perspective, NULL, NULL);
+	iDeviceContext->PSSetShader(PixSha_perspective, NULL, NULL);
+	iDeviceContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY::D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+	iDeviceContext->IASetInputLayout(lay_perspective);
+	iDeviceContext->DrawIndexed(12, 0, 0);
+
 }
 //#include "Assets\BasicPlatform\Wall.obj
 bool DEMO_APP::LoadObjFile(const char *_filename, std::vector<VERTEX_OBJMODEL> &_forVB){
@@ -677,7 +1087,7 @@ bool DEMO_APP::LoadObjFile(const char *_filename, std::vector<VERTEX_OBJMODEL> &
 
 	FILE *file = fopen( _filename, "r");
 	if (file == NULL){
-		printf("Connaot read this thing\n");
+		printf("Cannot read this thing\n");
 		return false;
 	}
 	for (;;){
@@ -748,6 +1158,8 @@ int WINAPI wWinMain( HINSTANCE hInstance, HINSTANCE, LPTSTR, int )
 	myApp.ShutDown(); 
 	return 0; 
 }
+
+// ********************************************************************* 
 LRESULT CALLBACK WndProc( HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam )
 {
     if(GetAsyncKeyState(VK_ESCAPE))
@@ -755,8 +1167,106 @@ LRESULT CALLBACK WndProc( HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam 
     switch ( message )
     {
         case ( WM_DESTROY ): { PostQuitMessage( 0 ); }
-        break;
+			break;
+		case (WM_KEYDOWN) : 
+			switch (wParam)
+			{
+				case VK_A: DEMO_APP::UpdateKeyboardInput(VK_A, true); break;
+				case VK_W: DEMO_APP::UpdateKeyboardInput(VK_W, true); break;
+				case VK_S: DEMO_APP::UpdateKeyboardInput(VK_S, true); break;
+				case VK_D: DEMO_APP::UpdateKeyboardInput(VK_D, true); break;
+				case VK_E: DEMO_APP::UpdateKeyboardInput(VK_E, true); break;
+				case VK_Q: DEMO_APP::UpdateKeyboardInput(VK_Q, true); break;
+				case VK_T: DEMO_APP::UpdateKeyboardInput(VK_T, true, true); break;
+				case VK_CONTROL: DEMO_APP::UpdateKeyboardInput(VK_CONTROL, true, true); break;
+				case VK_NUMPAD2: DEMO_APP::UpdateKeyboardInput(VK_NUMPAD2, true); break;
+				case VK_NUMPAD4: DEMO_APP::UpdateKeyboardInput(VK_NUMPAD4, true); break;
+				case VK_NUMPAD6: DEMO_APP::UpdateKeyboardInput(VK_NUMPAD6, true); break;
+				case VK_NUMPAD8: DEMO_APP::UpdateKeyboardInput(VK_NUMPAD8, true); break;
+				default:	break;
+			}
+			break;
+
+		case (WM_KEYUP):
+			switch (wParam)
+			{
+				case VK_A: DEMO_APP::UpdateKeyboardInput(VK_A, false); break;
+				case VK_W: DEMO_APP::UpdateKeyboardInput(VK_W, false); break;
+				case VK_S: DEMO_APP::UpdateKeyboardInput(VK_S, false); break;
+				case VK_D: DEMO_APP::UpdateKeyboardInput(VK_D, false); break;
+				case VK_E: DEMO_APP::UpdateKeyboardInput(VK_E, false); break;
+				case VK_Q: DEMO_APP::UpdateKeyboardInput(VK_Q, false); break;
+				case VK_T: DEMO_APP::UpdateKeyboardInput(VK_T, false, true); break;
+				case VK_CONTROL: DEMO_APP::UpdateKeyboardInput(VK_CONTROL, false, true); break;
+				case VK_NUMPAD2: DEMO_APP::UpdateKeyboardInput(VK_NUMPAD2, false); break;
+				case VK_NUMPAD4: DEMO_APP::UpdateKeyboardInput(VK_NUMPAD4, false); break;
+				case VK_NUMPAD6: DEMO_APP::UpdateKeyboardInput(VK_NUMPAD6, false); break;
+				case VK_NUMPAD8: DEMO_APP::UpdateKeyboardInput(VK_NUMPAD8, false); break;
+				default:		break;
+			}
+			break;
     }
     return DefWindowProc( hWnd, message, wParam, lParam );
 }
 //********************* END WARNING ************************//
+
+
+void DEMO_APP::CreateObj(){
+	// <Prototype Loader>
+	std::vector<VERTEX_OBJMODEL> vObjModel;
+	LoadObjFile("Assets\\BasicPlatform\\wall.obj", vObjModel);
+
+	D3D11_BUFFER_DESC vModel_desc;
+	ZeroMemory(&vModel_desc, sizeof(D3D11_BUFFER_DESC));
+	vModel_desc.BindFlags = D3D11_BIND_FLAG::D3D11_BIND_VERTEX_BUFFER;
+	vModel_desc.Usage = D3D11_USAGE::D3D11_USAGE_IMMUTABLE;
+	vModel_desc.ByteWidth = sizeof(VERTEX_OBJMODEL)*vObjModel.size();
+
+	D3D11_SUBRESOURCE_DATA vSub_Model;
+	ZeroMemory(&vSub_Model, sizeof(D3D11_SUBRESOURCE_DATA));
+	vSub_Model.pSysMem = vObjModel.data();
+
+	iDevice->CreateBuffer(&vModel_desc, &vSub_Model, &vb_Platform);
+
+	std::vector<unsigned int> modelIndices;
+	unsigned int Fst, Mid, Trd;
+	for (unsigned int i = 0; i < vObjModel.size(); i += 4){
+		Fst = i;
+		Mid = i + 1;
+		Trd = i + 2;
+
+		modelIndices.push_back(Fst);
+		modelIndices.push_back(Mid);
+		modelIndices.push_back(Trd);
+
+		Fst = Trd;
+		Mid = i + 3;
+		Trd = i;
+
+		modelIndices.push_back(Fst);
+		modelIndices.push_back(Mid);
+		modelIndices.push_back(Trd);
+	}
+	ObjIndxCount = modelIndices.size();
+
+	D3D11_BUFFER_DESC iModel_desc;
+	ZeroMemory(&iModel_desc, sizeof(D3D11_BUFFER_DESC));
+	iModel_desc.Usage = D3D11_USAGE::D3D11_USAGE_DEFAULT;
+	iModel_desc.BindFlags = D3D11_BIND_FLAG::D3D11_BIND_INDEX_BUFFER;
+	iModel_desc.ByteWidth = sizeof(unsigned int) * ObjIndxCount;
+
+	ZeroMemory(&vSub_Model, sizeof(D3D11_SUBRESOURCE_DATA));
+	vSub_Model.pSysMem = modelIndices.data();
+
+	iDevice->CreateBuffer(&iModel_desc, &vSub_Model, &ib_Platform);
+
+	D3D11_INPUT_ELEMENT_DESC layout_desc[3];
+
+	layout_desc[0] = { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 };
+	layout_desc[1] = { "TEXCOORD", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 };
+	layout_desc[2] = { "NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 };
+
+	iDevice->CreateInputLayout(layout_desc, 3, &SampleVertexShader, sizeof(SampleVertexShader), &lay_OBJModel);
+
+	// <Prototype Loader/>
+}
