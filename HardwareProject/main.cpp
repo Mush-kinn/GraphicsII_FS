@@ -441,7 +441,7 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 
 	iDevice->CreateBuffer(&box_desc,&box_data,&vb_Box);
 
-	unsigned int indx = 0, one, two, three;
+	unsigned int indx = 0;
 	vector<unsigned int> box_indx;
 
 	// Front Face 
@@ -864,13 +864,13 @@ bool DEMO_APP::Run()
 	iDeviceContext->DrawIndexed(12, 0, 0);
 
 // <Mah 3d/>
-
+#if 1
 	thread step1(&DEMO_APP::RenderDefault,this, DeffContext_Default, XMFLOAT3(0, 1, 0));
 
 	thread step2(&DEMO_APP::RenderDefault,this, DeffContext_Zero, XMFLOAT3(0, 2, 0));
 
 	thread step3(&DEMO_APP::RenderDefault,this, DeffContext_Model, XMFLOAT3(0, 3, 0));
-
+#endif
 // Skybox
 	toShader_perspective.model = XMMatrixTranspose(XMLoadFloat4x4(&m_BoxWorld));
 	ZeroMemory(&map_cube, sizeof(D3D11_MAPPED_SUBRESOURCE));
@@ -883,7 +883,6 @@ bool DEMO_APP::Run()
 
 	iDeviceContext->DrawIndexed(qty_Box, 0, 0);
 // Skybox end
-
 
 // <RTT>
 	iDeviceContext->ClearRenderTargetView(RTT_RenderTarget, Black);
@@ -936,8 +935,7 @@ bool DEMO_APP::Run()
 	iDeviceContext->PSSetShader(PixSha_perspective,0,0);
 // <RTT/>
 
-
-
+	
 // <MultiViewport>
 
 	iDeviceContext->PSSetShaderResources(0, 1, &ShaderView);
@@ -962,28 +960,32 @@ bool DEMO_APP::Run()
 	iDeviceContext->DrawIndexed(12, 0, 0);
 // <MultiViewport/>
 
+#if 1
 	step1.join();
 	step2.join();
 	step3.join();
 
 	ID3D11CommandList *CmdList;
-	ID3D11CommandList *CmdList_Zero000;
-	ID3D11CommandList *CmdList_Model000;
+	ID3D11CommandList *CmdList_Zero;
+	ID3D11CommandList *CmdList_Mode;
 
+
+	DeffContext_Zero->FinishCommandList(false, &CmdList_Zero);
+	DeffContext_Model->FinishCommandList(false, &CmdList_Model);
+
+	DeffContext_Default->ExecuteCommandList(CmdList_Zero, false);
+	DeffContext_Default->ExecuteCommandList(CmdList_Model, false);
 
 	DeffContext_Default->FinishCommandList(false, &CmdList);
-	DeffContext_Model->FinishCommandList(false, &CmdList_Model000);
-	DeffContext_Zero->FinishCommandList(false, &CmdList_Zero000);
-	
 	iDeviceContext->ExecuteCommandList(CmdList, false);
-	iDeviceContext->ExecuteCommandList(CmdList_Model000, false);
-	iDeviceContext->ExecuteCommandList(CmdList_Zero000, false);
 
-	iDeviceContext->Flush();
 
 	CmdList->Release();
-	CmdList_Model000->Release();
-	CmdList_Zero000->Release();
+	CmdList_Zero->Release();
+	CmdList_Model->Release();
+	iDeviceContext->Flush();
+#endif // 0
+
 
 	swapChain->Present(0, 0);
 
@@ -997,6 +999,8 @@ bool DEMO_APP::Run()
 
 bool DEMO_APP::ShutDown()
 {
+	OutputDebugStringW(L"\n\n\n <Detailed Dump> \n");
+	
 	iDeviceContext->ClearState();
 	iRenderTarget->Release();
 	iDevice->Release();
@@ -1034,7 +1038,7 @@ bool DEMO_APP::ShutDown()
 	DeffContext_Default->Release();
 	DeffContext_Model->Release();
 	DeffContext_Zero->Release();
-	OutputDebugStringW(L"\n\n\n poteto \n\n\n");
+	OutputDebugStringW(L"\n <Detailed Dump\\> \n\n\n");
 
 
 	Debuger->ReportLiveDeviceObjects(D3D11_RLDO_DETAIL);
@@ -1050,11 +1054,10 @@ void DEMO_APP::RenderDefault( ID3D11DeviceContext *iDeviceContext , XMFLOAT3 _Of
 	iDeviceContext->RSSetViewports(1, &viewPort);
 
 	XMMATRIX cubeWorld = XMLoadFloat4x4(&m_CubeWorld);
-	cubeWorld = XMMatrixRotationZ(-XMConvertToRadians(turn*timeX.Delta()))*cubeWorld;
-	//XMStoreFloat4x4(&m_CubeWorld, cubeWorld);
 	cubeWorld = cubeWorld * XMMatrixTranslationFromVector(XMLoadFloat3(&_Offset));
 	toShader_perspective.model = XMMatrixTranspose(cubeWorld);
 	toShader_perspective.view = XMMatrixTranspose(XMLoadFloat4x4(&m_view));
+	toShader_perspective.projection = XMMatrixTranspose(m_Projection);
 
 	D3D11_MAPPED_SUBRESOURCE map_cube;
 	ZeroMemory(&map_cube, sizeof(D3D11_MAPPED_SUBRESOURCE));
