@@ -1,9 +1,10 @@
 // Per-pixel color data passed through the pixel shader.
-struct PixelShaderInput
-{
-	float4 pos : SV_POSITION;
-	float2 uv : TEXCOORD;
-};
+//struct PixelShaderInput
+//{
+//	float4 pos : SV_POSITION;
+//	float2 uv : TEXCOORD;
+//};
+#include "Perspective.hlsli"
 
 Texture2D testMap : register(t0);
 

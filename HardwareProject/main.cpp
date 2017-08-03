@@ -24,6 +24,7 @@ using namespace DirectX;
 #include "Assets\Portal\portal_up.h"
 
 #include "AlphaDefines.h"
+#include "SharedDefines.h"
 
 #include "Trivial_PS.csh"
 #include "Trivial_VS.csh"
@@ -142,11 +143,6 @@ class DEMO_APP
 	ID3D11DeviceContext *DeffContext_Model;
 	ID3D11DeviceContext *DeffContext_Zero;
 
-	ID3D11CommandList *CmdList_Default;
-	ID3D11CommandList *CmdList_RTT;
-	ID3D11CommandList *CmdList_Model;
-	ID3D11CommandList *CmdList_Zero;
-
 	ID3D11Device *iDevice;
 	ID3D11DeviceContext *iDeviceContext;
 	D3D11_VIEWPORT viewPort;
@@ -158,13 +154,11 @@ class DEMO_APP
 		XMFLOAT2 padding;
 	};
 
-	struct cbMirror_Perspective{
-		XMMATRIX model;
-		XMMATRIX view;
-		XMMATRIX projection;
+	struct cbMirror_Lighting{
+		XMMATRIX WorldLight;
+		XMMATRIX someting;
+		// another thing
 	};
-	
-	SEND_TO_VRAM toShader;
 	cbMirror_Perspective toShader_perspective;
 	cbMirror_Perspective toshader_hoverCam;
 	cbMirror_Perspective toShader_RTT;
@@ -173,11 +167,6 @@ public:
 
 	struct SIMPLE_VERTEX{
 		XMFLOAT2 POSITION;
-	};
-
-	struct VERTEX_3D{
-		XMFLOAT3 pos;
-		XMFLOAT2 uv;
 	};
 
 	struct VERTEX_OBJMODEL{
@@ -336,9 +325,7 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
     ShowWindow( window, SW_SHOW );
 	//********************* END WARNING ************************//
 
-
-
-
+	
 	DXGI_SWAP_CHAIN_DESC chainDesc;
 	ZeroMemory(&chainDesc, sizeof(DXGI_SWAP_CHAIN_DESC));
 	chainDesc.BufferCount = 1;
@@ -626,7 +613,7 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 	rotation_trix = XMMatrixRotationX(XMConvertToRadians(18));
 	view = XMMatrixMultiply(view, rotation_trix);
 	view = XMMatrixInverse(nullptr, view);
-	toShader_perspective.view = XMMatrixTranspose( view);	
+	toShader_perspective.view = XMMatrixTranspose(view);	
 	XMStoreFloat4x4(&m_view, view);
 
 	// zNear = 0.1;
@@ -840,7 +827,7 @@ bool DEMO_APP::Run()
 	D3D11_MAPPED_SUBRESOURCE map_cube;
 	ZeroMemory(&map_cube, sizeof(D3D11_MAPPED_SUBRESOURCE));
 	iDeviceContext->Map(cBuff_perspective, 0, D3D11_MAP::D3D11_MAP_WRITE_DISCARD, NULL, &map_cube);
-	memcpy(map_cube.pData, &toShader_perspective, sizeof(toShader_perspective));
+	memcpy(map_cube.pData, &toShader_perspective, sizeof(cbMirror_Perspective));
 	iDeviceContext->Unmap(cBuff_perspective, 0);
 	iDeviceContext->VSSetConstantBuffers(0, 1, &cBuff_perspective);
 
@@ -967,8 +954,7 @@ bool DEMO_APP::Run()
 
 	ID3D11CommandList *CmdList;
 	ID3D11CommandList *CmdList_Zero;
-	ID3D11CommandList *CmdList_Mode;
-
+	ID3D11CommandList *CmdList_Model;
 
 	DeffContext_Zero->FinishCommandList(false, &CmdList_Zero);
 	DeffContext_Model->FinishCommandList(false, &CmdList_Model);
@@ -999,7 +985,7 @@ bool DEMO_APP::Run()
 
 bool DEMO_APP::ShutDown()
 {
-	OutputDebugStringW(L"\n\n\n <Detailed Dump> \n");
+	OutputDebugStringW(L"\n\n\n <Detailed Dump> \n\n");
 	
 	iDeviceContext->ClearState();
 	iRenderTarget->Release();
@@ -1038,11 +1024,11 @@ bool DEMO_APP::ShutDown()
 	DeffContext_Default->Release();
 	DeffContext_Model->Release();
 	DeffContext_Zero->Release();
-	OutputDebugStringW(L"\n <Detailed Dump\\> \n\n\n");
-
 
 	Debuger->ReportLiveDeviceObjects(D3D11_RLDO_DETAIL);
 	Debuger->Release();
+	OutputDebugStringW(L"\n </Detailed Dump> \n\n\n");
+
 	UnregisterClass( L"DirectXApplication", application ); 
 	return true;
 }

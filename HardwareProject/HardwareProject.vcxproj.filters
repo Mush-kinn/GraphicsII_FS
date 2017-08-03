@@ -16,6 +16,9 @@
     <Filter Include="Header Files\SkyboxPortal">
       <UniqueIdentifier>{fe57d3a2-50ab-4e29-aafe-abf281d8e2c6}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Shaders">
+      <UniqueIdentifier>{147127fb-cb60-4948-87db-7de911e86f61}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="XTime.cpp">
@@ -59,23 +62,32 @@
     <ClInclude Include="DDSTextureLoader.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="SharedDefines.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <FxCompile Include="Trivial_PS.hlsl" />
-    <FxCompile Include="Trivial_VS.hlsl" />
-    <FxCompile Include="SampleVertexShader.hlsl" />
-    <FxCompile Include="SamplePixelShader.hlsl" />
-    <FxCompile Include="RTT_PixelShader.hlsl">
-      <Filter>Source Files</Filter>
+    <FxCompile Include="Trivial_VS.hlsl">
+      <Filter>Shaders</Filter>
     </FxCompile>
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="SamplePixelShader.csh">
-      <Filter>Source Files</Filter>
-    </None>
-    <None Include="SampleVertexShader.csh">
-      <Filter>Source Files</Filter>
-    </None>
+    <FxCompile Include="SamplePixelShader.hlsl">
+      <Filter>Shaders</Filter>
+    </FxCompile>
+    <FxCompile Include="SampleVertexShader.hlsl">
+      <Filter>Shaders</Filter>
+    </FxCompile>
+    <FxCompile Include="Trivial_PS.hlsl">
+      <Filter>Shaders</Filter>
+    </FxCompile>
+    <FxCompile Include="RTT_PixelShader.hlsl">
+      <Filter>Shaders</Filter>
+    </FxCompile>
+    <FxCompile Include="VS_Normal3D.hlsl">
+      <Filter>Shaders</Filter>
+    </FxCompile>
+    <FxCompile Include="PS_Normal3D.hlsl">
+      <Filter>Shaders</Filter>
+    </FxCompile>
   </ItemGroup>
   <ItemGroup>
     <Image Include="Assets\Test_UV_Map.dds">
@@ -99,5 +111,10 @@
     <Image Include="Assets\Portal\portal_bk.tga">
       <Filter>Resource Files</Filter>
     </Image>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Perspective.hlsli">
+      <Filter>Shaders</Filter>
+    </None>
   </ItemGroup>
 </Project>
