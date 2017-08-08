@@ -18,13 +18,13 @@
 PixelShaderInput main(VERTEX_3D input)
 {
 	PixelShaderInput output;
-	float4 pos = float4(input.pos, 1.0f);
+	float4 pos = float4(input.pos.xyz, 1.0f);
 
 	// Transform the vertex position into projected space.
 	output.pos = MultiPerspective(pos);
 
 	// Pass the color through without modification.
-	output.uv = input.uv;
+	output.uv.xy = input.uv.xy;
 
 	return output;
 }

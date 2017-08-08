@@ -129,12 +129,12 @@ class DEMO_APP
 
 	// Views
 	ID3D11RenderTargetView *iRenderTarget;
-	ID3D11ShaderResourceView *ShaderView;
 	ID3D11RenderTargetView *RTT_RenderTarget;
-	D3D11_VIEWPORT hovCam_view;
+	ID3D11ShaderResourceView *ShaderView;
 	ID3D11ShaderResourceView *RTT_ShaderView;
-	ID3D11DepthStencilView *iDepthStencilView;
 	ID3D11ShaderResourceView *SkyboxView;
+	D3D11_VIEWPORT hovCam_view;
+	ID3D11DepthStencilView *iDepthStencilView;
 
 	// Pending...
 	ID3D11SamplerState *SampleState;
@@ -154,11 +154,6 @@ class DEMO_APP
 		XMFLOAT2 padding;
 	};
 
-	struct cbMirror_Lighting{
-		XMMATRIX WorldLight;
-		XMMATRIX someting;
-		// another thing
-	};
 	cbMirror_Perspective toShader_perspective;
 	cbMirror_Perspective toshader_hoverCam;
 	cbMirror_Perspective toShader_RTT;
@@ -411,9 +406,9 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 	XMStoreFloat4x4(&m_BoxWorld, XMMatrixIdentity());
 	VERTEX_3D realCube[8] = {
 			{ XMFLOAT3(-1, 1, -1), XMFLOAT2(0, 0) }, { XMFLOAT3(1, 1, -1), XMFLOAT2(1, 0) },
-			{ XMFLOAT3(-1, -1, -1), XMFLOAT2(0, 1) }, { XMFLOAT3(1, -1, -1), XMFLOAT2(1, 1) },
-			{ XMFLOAT3(1, 1, 1), XMFLOAT2(0, 0) }, { XMFLOAT3(-1, 1, 1), XMFLOAT2(1, 0) },
-			{ XMFLOAT3(1, -1, 1), XMFLOAT2(0, 1) },{ XMFLOAT3(-1, -1,-1), XMFLOAT2(1, 1) }
+			{ XMFLOAT3(1, -1, -1), XMFLOAT2(0, 1) }, { XMFLOAT3(-1, -1, -1), XMFLOAT2(1, 1) },
+			{ XMFLOAT3(-1, 1, 1), XMFLOAT2(0, 0) }, { XMFLOAT3(1, 1, 1), XMFLOAT2(1, 0) },
+			{ XMFLOAT3(1, -1, 1), XMFLOAT2(0, 1) },{ XMFLOAT3(-1, -1, 1), XMFLOAT2(1, 1) }
 	};
 
 	D3D11_BUFFER_DESC box_desc;
@@ -432,47 +427,47 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 	vector<unsigned int> box_indx;
 
 	// Front Face 
+	box_indx.push_back(3);
 	box_indx.push_back(1);
 	box_indx.push_back(0);
-	box_indx.push_back(2);
-	box_indx.push_back(2);
 	box_indx.push_back(3);
+	box_indx.push_back(2);
 	box_indx.push_back(1);
 	// Back Face
-	box_indx.push_back(5);
-	box_indx.push_back(4);
 	box_indx.push_back(6);
+	box_indx.push_back(4);
+	box_indx.push_back(5);
 	box_indx.push_back(6);
 	box_indx.push_back(7);
-	box_indx.push_back(5);
+	box_indx.push_back(4);
 	// Right
-	box_indx.push_back(4);
-	box_indx.push_back(1);
-	box_indx.push_back(3);
-	box_indx.push_back(3);
-	box_indx.push_back(6);
-	box_indx.push_back(4);
-	// Left
-	box_indx.push_back(0);
-	box_indx.push_back(5);
-	box_indx.push_back(7);
-	box_indx.push_back(7);
 	box_indx.push_back(2);
+	box_indx.push_back(5);
+	box_indx.push_back(1);
+	box_indx.push_back(2);
+	box_indx.push_back(6);
+	box_indx.push_back(5);
+	// Left
+	box_indx.push_back(7);
+	box_indx.push_back(0);
+	box_indx.push_back(4);
+	box_indx.push_back(7);
+	box_indx.push_back(3);
 	box_indx.push_back(0);
 	// Top
-	box_indx.push_back(4);
-	box_indx.push_back(5);
 	box_indx.push_back(0);
+	box_indx.push_back(5);
+	box_indx.push_back(4);
 	box_indx.push_back(0);
 	box_indx.push_back(1);
-	box_indx.push_back(4);
+	box_indx.push_back(5);
 	// Bottom
-	box_indx.push_back(3);
-	box_indx.push_back(2);
 	box_indx.push_back(7);
+	box_indx.push_back(2);
+	box_indx.push_back(3);
 	box_indx.push_back(7);
 	box_indx.push_back(6);
-	box_indx.push_back(3);
+	box_indx.push_back(2);
 
 	qty_Box = box_indx.size();
 
@@ -709,8 +704,8 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 	iDevice->CreatePixelShader(&SamplePixelShader, sizeof(SamplePixelShader), NULL, &PixSha_perspective);
 
 	D3D11_INPUT_ELEMENT_DESC layout3d[2];
-	layout3d[0] = { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 };
-	layout3d[1] = { "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 };
+	layout3d[0] = { "POSITION", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 };
+	layout3d[1] = { "TEXCOORD", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 };
 
 	iDevice->CreateInputLayout(layout3d, 2, &SampleVertexShader, sizeof(SampleVertexShader), &lay_perspective);
 
@@ -841,7 +836,10 @@ bool DEMO_APP::Run()
 	iDeviceContext->IASetIndexBuffer(ib_Cube, DXGI_FORMAT::DXGI_FORMAT_R32_UINT, 0);
 
 	iDeviceContext->PSSetSamplers(0, 1, &SampleState);
-	iDeviceContext->PSSetShaderResources(0, 1, &ShaderView);
+	//iDeviceContext->PSSetShaderResources(0, 1, &ShaderView);
+	iDeviceContext->PSSetShaderResources(1, 1, &SkyboxView);
+
+
 	 
 	iDeviceContext->VSSetShader(VertSha_perspective, NULL, NULL);
 	iDeviceContext->PSSetShader(PixSha_perspective, NULL, NULL);
@@ -864,11 +862,12 @@ bool DEMO_APP::Run()
 	iDeviceContext->Map(cBuff_perspective, 0, D3D11_MAP::D3D11_MAP_WRITE_DISCARD, NULL, &map_cube);
 	memcpy(map_cube.pData, &toShader_perspective, sizeof(toShader_perspective));
 	iDeviceContext->Unmap(cBuff_perspective, 0);
-	
-	iDeviceContext->IAGetVertexBuffers(0, 1, &vb_Box, &_strides, &_offSets);
+	//iDeviceContext->PSSetShaderResources(1, 1, &SkyboxView);
+	iDeviceContext->IASetVertexBuffers(0, 1, &vb_Box, &_strides, &_offSets);
 	iDeviceContext->IASetIndexBuffer(ib_Box, DXGI_FORMAT_R32_UINT, 0);
 
 	iDeviceContext->DrawIndexed(qty_Box, 0, 0);
+
 // Skybox end
 
 // <RTT>

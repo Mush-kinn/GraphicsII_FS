@@ -5,14 +5,15 @@
 #ifdef __cplusplus
 	#pragma once
 	#include <DirectXMath.h>
-	typedef unsigned int		uint;
-	typedef DirectX::XMFLOAT2	float2;
-	typedef DirectX::XMFLOAT3	float3;
-	typedef DirectX::XMFLOAT4	float4;
-	typedef DirectX::XMFLOAT4X4	float4x4;
-	typedef DirectX::XMMATRIX	matrix;
 	// lets us ensure constant buffers and their variables are 16byte aligned to HLSL 4-float registers
 	#define _regAlign __declspec(align(16))
+
+	typedef _regAlign unsigned int			uint;
+	typedef _regAlign DirectX::XMFLOAT2		float2;
+	typedef _regAlign DirectX::XMFLOAT3		float3;
+	typedef _regAlign DirectX::XMFLOAT4		float4;
+	typedef _regAlign DirectX::XMFLOAT4X4	float4x4;
+	typedef _regAlign DirectX::XMMATRIX		matrix;
 	// allows us to attach semantics to HLSL variables without bugging C++
 	#define SEMANTIC(s_name) /* : s_name */
 
