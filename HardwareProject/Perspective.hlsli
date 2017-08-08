@@ -11,7 +11,7 @@ float4 MultiPerspective(float4 pos){
 
 struct PixelShaderInput{
 	float4 pos : SV_POSITION;
-	float2 uv : TEXCOORD;
+	float3 uv : TEXCOORD;
 };
 
 struct LightingShaderInput{

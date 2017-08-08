@@ -808,9 +808,6 @@ bool DEMO_APP::Run()
 	FLOAT DarkBlue[] = { 0.0f, 0.0f, 0.45f, 1.0f };
 	FLOAT Black[] = { 0.0f, 0.0f, 0.0f, 1.0f };
 
-
-
-
 	UINT _startSlot = 0;
 	UINT _numBuffs = 1;
 	UINT _strides = 0;
@@ -824,6 +821,7 @@ bool DEMO_APP::Run()
 	iDeviceContext->IASetInputLayout(lay_perspective);
 
 	toShader_perspective.model = XMMatrixTranspose(XMLoadFloat4x4(&m_BoxWorld));
+	toShader_perspective.SkyboxToggle = 1;
 
 	D3D11_MAPPED_SUBRESOURCE map_cube;
 	ZeroMemory(&map_cube, sizeof(D3D11_MAPPED_SUBRESOURCE));
@@ -836,9 +834,11 @@ bool DEMO_APP::Run()
 	iDeviceContext->VSSetShader(VertSha_perspective, NULL, NULL);
 
 	// PS Stage
+	iDeviceContext->PSSetConstantBuffers(0, 1, &cBuff_perspective);
 	iDeviceContext->PSSetSamplers(0, 1, &SampleState);
 	iDeviceContext->PSSetShader(PixSha_perspective, NULL, NULL);
 	iDeviceContext->PSSetShaderResources(1, 1, &SkyboxView);
+	iDeviceContext->PSSetShaderResources(0, 1, &ShaderView);
 
 	// RS Stage
 	iDeviceContext->RSSetViewports(1, &viewPort);
@@ -854,9 +854,11 @@ bool DEMO_APP::Run()
 // </Skybox>
 
 // <Mah 3d>
+
 	iDeviceContext->IASetVertexBuffers(0, 1, &vb_Cube, &_strides, &_offSets);
 	iDeviceContext->IASetIndexBuffer(ib_Cube, DXGI_FORMAT::DXGI_FORMAT_R32_UINT, 0);
 
+	toShader_perspective.SkyboxToggle = 0;
 	XMMATRIX cubeWorld= XMLoadFloat4x4(&m_CubeWorld);
 	cubeWorld = XMMatrixRotationZ(-XMConvertToRadians(turn*timeX.Delta()))*cubeWorld;
 	toShader_perspective.model = XMMatrixTranspose(cubeWorld);
@@ -868,7 +870,6 @@ bool DEMO_APP::Run()
 	memcpy(map_cube.pData, &toShader_perspective, sizeof(cbMirror_Perspective));
 	iDeviceContext->Unmap(cBuff_perspective, 0);
 
-	iDeviceContext->PSSetShaderResources(0, 1, &ShaderView);
 
 	iDeviceContext->DrawIndexed(12, 0, 0);
 
@@ -898,6 +899,8 @@ bool DEMO_APP::Run()
 	iDeviceContext->OMSetRenderTargets(1, &RTT_RenderTarget, NULL);
 	cubeWorld = XMLoadFloat4x4(&m_CubeWorld);
 	toShader_RTT.model = XMMatrixTranspose(cubeWorld);
+	toShader_perspective.SkyboxToggle = 0;
+
 
 	_strides = static_cast<UINT>(sizeof(VERTEX_3D));
 	iDeviceContext->IASetVertexBuffers(0, 1, &vb_Cube, &_strides, &_offSets);
@@ -910,8 +913,8 @@ bool DEMO_APP::Run()
 	iDeviceContext->VSSetConstantBuffers(0, 1, &cBuff_perspective);
 
 	iDeviceContext->DrawIndexed(12, 0, 0);
-	iDeviceContext->OMSetRenderTargets(1, &iRenderTarget, iDepthStencilView);
 
+	iDeviceContext->OMSetRenderTargets(1, &iRenderTarget, iDepthStencilView);
 	iDeviceContext->PSSetShaderResources(0, 1, &RTT_ShaderView);
 
 // <RTT/>
@@ -921,6 +924,8 @@ bool DEMO_APP::Run()
 	cubeWorld = XMMatrixScaling(0.25f, 0.25f, 0.25f) * cubeWorld;
 	cubeWorld = cubeWorld * XMMatrixTranslation(-1.0, 0, 0);
 	toShader_perspective.model = XMMatrixTranspose(cubeWorld);
+	toShader_perspective.SkyboxToggle = 0;
+
 
 	ZeroMemory(&map_cube, sizeof(D3D11_MAPPED_SUBRESOURCE));
 	iDeviceContext->Map(cBuff_perspective, 0, D3D11_MAP::D3D11_MAP_WRITE_DISCARD, NULL, &map_cube);
@@ -948,12 +953,14 @@ bool DEMO_APP::Run()
 // <MultiViewport>
 
 	iDeviceContext->PSSetShaderResources(0, 1, &ShaderView);
+
 	XMMATRIX Hover = XMLoadFloat4x4(&m_hoverCam);
 	Hover = XMMatrixRotationY(XMConvertToRadians(turn*timeX.Delta() * -3.2f)) * Hover;
 	XMStoreFloat4x4(&m_hoverCam, Hover);
 	cubeWorld = XMLoadFloat4x4(&m_CubeWorld);
 	toshader_hoverCam.model = XMMatrixTranspose(cubeWorld);
 	toshader_hoverCam.view = XMMatrixTranspose(Hover);
+	toShader_perspective.SkyboxToggle = 0;
 
 	ZeroMemory(&map_cube, sizeof(D3D11_MAPPED_SUBRESOURCE));
 	iDeviceContext->Map(cBuff_perspective, 0, D3D11_MAP::D3D11_MAP_WRITE_DISCARD, NULL, &map_cube);

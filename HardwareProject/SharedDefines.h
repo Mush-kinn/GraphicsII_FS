@@ -43,6 +43,7 @@ CONSTANT_BUFFER_BEGIN(cbMirror_Perspective, b0)
 	matrix model;
 	matrix view;
 	matrix projection;
+	uint SkyboxToggle;
 CONSTANT_BUFFER_END
 
 // </Constant Buffers>

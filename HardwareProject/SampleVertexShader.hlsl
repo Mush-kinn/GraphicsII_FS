@@ -24,8 +24,11 @@ PixelShaderInput main(VERTEX_3D input)
 	output.pos = MultiPerspective(pos);
 
 	// Pass the color through without modification.
-
-	output.uv = input.pos.xy;
-
+	if (SkyboxToggle){
+		output.uv = input.pos.xyz;
+	}
+	else {
+		output.uv.xy = input.uv;
+	}
 	return output;
 }
