@@ -24,7 +24,8 @@ PixelShaderInput main(VERTEX_3D input)
 	output.pos = MultiPerspective(pos);
 
 	// Pass the color through without modification.
-	output.uv.xy = input.uv.xy;
+
+	output.uv = input.pos.xy;
 
 	return output;
 }

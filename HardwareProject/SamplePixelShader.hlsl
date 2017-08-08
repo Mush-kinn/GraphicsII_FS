@@ -15,6 +15,6 @@ SamplerState s : register(s0);
 // A pass-through function for the (interpolated) color data.
 float4 main(PixelShaderInput input) : SV_TARGET
 {
-	float4 temp = Skybox.Sample(s, float3(input.uv,1));
+	float4 temp = Skybox.Sample(s,float3(input.uv,input.pos.z) );
 	return temp;
 }
