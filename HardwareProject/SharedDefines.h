@@ -38,6 +38,7 @@
 	#define VERTEX_BUFFER_END };
 
 #endif
+
 // <Constant Buffers>
 CONSTANT_BUFFER_BEGIN(cbMirror_Perspective, b0)
 	matrix model;

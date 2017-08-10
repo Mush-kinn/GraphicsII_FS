@@ -224,11 +224,6 @@
     <None Include="Perspective.hlsli" />
   </ItemGroup>
   <ItemGroup>
-    <Image Include="Assets\Portal\portal_bk.tga" />
-    <Image Include="Assets\Portal\portal_ft.tga" />
-    <Image Include="Assets\Portal\portal_lf.tga" />
-    <Image Include="Assets\Portal\portal_rt.tga" />
-    <Image Include="Assets\Portal\portal_up.tga" />
     <Image Include="Assets\SkyboxOcean.dds" />
     <Image Include="Assets\Test_UV_Map.dds" />
   </ItemGroup>

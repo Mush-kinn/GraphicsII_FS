@@ -96,21 +96,6 @@
     <Image Include="Assets\SkyboxOcean.dds">
       <Filter>Resource Files</Filter>
     </Image>
-    <Image Include="Assets\Portal\portal_ft.tga">
-      <Filter>Resource Files</Filter>
-    </Image>
-    <Image Include="Assets\Portal\portal_lf.tga">
-      <Filter>Resource Files</Filter>
-    </Image>
-    <Image Include="Assets\Portal\portal_rt.tga">
-      <Filter>Resource Files</Filter>
-    </Image>
-    <Image Include="Assets\Portal\portal_up.tga">
-      <Filter>Resource Files</Filter>
-    </Image>
-    <Image Include="Assets\Portal\portal_bk.tga">
-      <Filter>Resource Files</Filter>
-    </Image>
   </ItemGroup>
   <ItemGroup>
     <None Include="Perspective.hlsli">
