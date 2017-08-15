@@ -25,6 +25,7 @@ using namespace DirectX;
 #include "SampleVertexShader.csh"
 #include "SamplePixelShader.csh"
 #include "RTT_PixelShader.csh"
+#include "GS_Prototype.csh"
 
 #include "DDSTextureLoader.h"
 
@@ -104,6 +105,7 @@ class DEMO_APP
 	ID3D11Buffer *ib_Platform;
 	ID3D11Buffer *vb_Box;
 	ID3D11Buffer *ib_Box;
+	ID3D11Buffer *cBuff_RTT;
 
 	// Layouts
 	ID3D11InputLayout *lay_perspective;
@@ -113,6 +115,7 @@ class DEMO_APP
 	ID3D11VertexShader *VertSha_perspective;
 	ID3D11PixelShader *PixSha_perspective;
 	ID3D11PixelShader *PixSha_RTT;
+	ID3D11GeometryShader *GeoSha_Prototype;
 	
 
 	// textures
@@ -128,6 +131,7 @@ class DEMO_APP
 	ID3D11ShaderResourceView *RTT_ShaderView;
 	ID3D11ShaderResourceView *SkyboxView;
 	ID3D11DepthStencilView *iDepthStencilView;
+	ID3D11DepthStencilView *RTT_DepthStencilView;
 	D3D11_VIEWPORT hovCam_view;
 
 	// Pending...
@@ -148,7 +152,7 @@ class DEMO_APP
 		XMFLOAT2 padding;
 	};
 
-	cbMirror_Perspective toShader_perspective;
+	cbMirror_Perspective toshader_Default;
 	cbMirror_Perspective toshader_hoverCam;
 	cbMirror_Perspective toShader_RTT;
 
@@ -261,7 +265,6 @@ void DEMO_APP::UpdateInput(){
 		XMMATRIX temp = XMMatrixIdentity();
 		INverted = XMMatrixInverse(NULL, XMLoadFloat4x4(&m_view));
 		XMMatrixDecompose(&Scale, &Rot, &Trans, INverted);
-		//XMVector4Transform(Trans, (temp*XMMatrixTranslation(0, newCamOffset.y, 0)));
 		XMVECTOR aVector = XMVector4Transform(Trans, (temp*XMMatrixTranslation(0, newCamOffset.y, 0)));
 		XMMatrixDecompose(&Scale, &Rot, &Trans, XMLoadFloat4x4(& m_CubeWorld));
 		XMStoreFloat3(&Tracker_Tgt, Trans);
@@ -422,7 +425,7 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 
 	unsigned int indx = 0;
 	vector<unsigned int> box_indx;
-
+#pragma region SKYboxCube
 	// Front Face 
 	box_indx.push_back(3);
 	box_indx.push_back(1);
@@ -465,6 +468,8 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 	box_indx.push_back(7);
 	box_indx.push_back(6);
 	box_indx.push_back(2);
+
+#pragma endregion
 
 	qty_Box = box_indx.size();
 
@@ -605,7 +610,7 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 	rotation_trix = XMMatrixRotationX(XMConvertToRadians(18));
 	view = XMMatrixMultiply(view, rotation_trix);
 	view = XMMatrixInverse(nullptr, view);
-	toShader_perspective.view = XMMatrixTranspose(view);	
+	toshader_Default.view = XMMatrixTranspose(view);	
 	XMStoreFloat4x4(&m_view, view);
 
 	// zNear = 0.1;
@@ -613,14 +618,14 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 	// vFOV = 90
 	float aspect = BACKBUFFER_WIDTH / BACKBUFFER_HEIGHT;
 	m_Projection = XMMatrixPerspectiveFovLH(XMConvertToRadians(90.0f), aspect, 0.1f, 1000.0f);
-	toShader_perspective.projection = XMMatrixTranspose(m_Projection);
+	toshader_Default.projection = XMMatrixTranspose(m_Projection);
 
 
 #pragma endregion
 
 	XMMATRIX model = XMLoadFloat4x4(&m_CubeWorld);
 	model = XMMatrixTranslation(0.7f, 0, 0);
-	toShader_perspective.model = XMMatrixTranspose(model);
+	toshader_Default.model = XMMatrixTranspose(model);
 	XMStoreFloat4x4(&m_CubeWorld, model); 
 
 #pragma region extraView
@@ -691,6 +696,10 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 	iDevice->CreateShaderResourceView(tx_RTT, &RTTShaderview_desc, &RTT_ShaderView);
 
 	iDevice->CreatePixelShader(&RTT_PixelShader, sizeof(RTT_PixelShader), NULL, &PixSha_RTT);
+
+	D3D11_BUFFER_DESC RTT_CBUFF_DESC;
+	ZeroMemory(&RTT_CBUFF_DESC, sizeof(D3D11_BUFFER_DESC));
+
 
 	
 // <RTT/>
@@ -784,6 +793,8 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 // <Prototype Loader/>
 #pragma endregion
 
+	iDevice->CreateGeometryShader(GS_Prototype, sizeof(GS_Prototype), NULL, &GeoSha_Prototype);
+
 	turn = 12.0f;
 	timeX.Throttle(2);
 	ZeroMemory(&newCamOffset, sizeof(newCamOffset));
@@ -815,18 +826,21 @@ bool DEMO_APP::Run()
 	iDeviceContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY::D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 	iDeviceContext->IASetInputLayout(lay_perspective);
 
-	toShader_perspective.model = XMMatrixTranspose(XMLoadFloat4x4(&m_BoxWorld));
-	toShader_perspective.SkyboxToggle = 1;
+	toshader_Default.model = XMMatrixTranspose(XMLoadFloat4x4(&m_BoxWorld));
+	toshader_Default.SkyboxToggle = 1;
 
 	D3D11_MAPPED_SUBRESOURCE map_cube;
 	ZeroMemory(&map_cube, sizeof(D3D11_MAPPED_SUBRESOURCE));
 	iDeviceContext->Map(cBuff_perspective, 0, D3D11_MAP::D3D11_MAP_WRITE_DISCARD, NULL, &map_cube);
-	memcpy(map_cube.pData, &toShader_perspective, sizeof(toShader_perspective));
+	memcpy(map_cube.pData, &toshader_Default, sizeof(toshader_Default));
 	iDeviceContext->Unmap(cBuff_perspective, 0);
 
 	// VS Stage
 	iDeviceContext->VSSetConstantBuffers(0, 1, &cBuff_perspective);
 	iDeviceContext->VSSetShader(VertSha_perspective, NULL, NULL);
+
+	// GS Stage
+	iDeviceContext->GSSetShader(GeoSha_Prototype, NULL, NULL);
 
 	// PS Stage
 	iDeviceContext->PSSetConstantBuffers(0, 1, &cBuff_perspective);
@@ -853,16 +867,16 @@ bool DEMO_APP::Run()
 	iDeviceContext->IASetVertexBuffers(0, 1, &vb_Cube, &_strides, &_offSets);
 	iDeviceContext->IASetIndexBuffer(ib_Cube, DXGI_FORMAT::DXGI_FORMAT_R32_UINT, 0);
 
-	toShader_perspective.SkyboxToggle = 0;
+	toshader_Default.SkyboxToggle = 0;
 	XMMATRIX cubeWorld= XMLoadFloat4x4(&m_CubeWorld);
 	cubeWorld = XMMatrixRotationZ(-XMConvertToRadians(turn*timeX.Delta()))*cubeWorld;
-	toShader_perspective.model = XMMatrixTranspose(cubeWorld);
+	toshader_Default.model = XMMatrixTranspose(cubeWorld);
 	XMStoreFloat4x4(&m_CubeWorld, cubeWorld);
-	toShader_perspective.view =XMMatrixTranspose( XMLoadFloat4x4(&m_view)) ;
+	toshader_Default.view =XMMatrixTranspose( XMLoadFloat4x4(&m_view)) ;
 
 	ZeroMemory(&map_cube, sizeof(D3D11_MAPPED_SUBRESOURCE));
 	iDeviceContext->Map(cBuff_perspective, 0, D3D11_MAP::D3D11_MAP_WRITE_DISCARD, NULL, &map_cube);
-	memcpy(map_cube.pData, &toShader_perspective, sizeof(cbMirror_Perspective));
+	memcpy(map_cube.pData, &toshader_Default, sizeof(cbMirror_Perspective));
 	iDeviceContext->Unmap(cBuff_perspective, 0);
 
 	iDeviceContext->DrawIndexed(12, 0, 0);
@@ -903,13 +917,13 @@ bool DEMO_APP::Run()
 	cubeWorld = XMLoadFloat4x4(&m_CubeWorld);
 	cubeWorld = XMMatrixScaling(0.25f, 0.25f, 0.25f) * cubeWorld;
 	cubeWorld = cubeWorld * XMMatrixTranslation(-1.0, 0, 0);
-	toShader_perspective.model = XMMatrixTranspose(cubeWorld);
-	toShader_perspective.SkyboxToggle = 0;
+	toshader_Default.model = XMMatrixTranspose(cubeWorld);
+	toshader_Default.SkyboxToggle = 0;
 
 
 	ZeroMemory(&map_cube, sizeof(D3D11_MAPPED_SUBRESOURCE));
 	iDeviceContext->Map(cBuff_perspective, 0, D3D11_MAP::D3D11_MAP_WRITE_DISCARD, NULL, &map_cube);
-	memcpy(map_cube.pData, &toShader_perspective, sizeof(toShader_perspective));
+	memcpy(map_cube.pData, &toshader_Default, sizeof(toshader_Default));
 	iDeviceContext->Unmap(cBuff_perspective, 0);
 	iDeviceContext->VSSetConstantBuffers(0, 1, &cBuff_perspective);
 
@@ -1033,6 +1047,7 @@ bool DEMO_APP::ShutDown()
 	DeffContext_Default->Release();
 	DeffContext_Model->Release();
 	DeffContext_Zero->Release();
+	GeoSha_Prototype->Release();
 
 	Debuger->ReportLiveDeviceObjects(D3D11_RLDO_DETAIL);
 	Debuger->Release();
@@ -1050,14 +1065,14 @@ void DEMO_APP::RenderDefault( ID3D11DeviceContext *iDeviceContext , XMFLOAT3 _Of
 
 	XMMATRIX cubeWorld = XMLoadFloat4x4(&m_CubeWorld);
 	cubeWorld = cubeWorld * XMMatrixTranslationFromVector(XMLoadFloat3(&_Offset));
-	toShader_perspective.model = XMMatrixTranspose(cubeWorld);
-	toShader_perspective.view = XMMatrixTranspose(XMLoadFloat4x4(&m_view));
-	toShader_perspective.projection = XMMatrixTranspose(m_Projection);
+	toshader_Default.model = XMMatrixTranspose(cubeWorld);
+	toshader_Default.view = XMMatrixTranspose(XMLoadFloat4x4(&m_view));
+	toshader_Default.projection = XMMatrixTranspose(m_Projection);
 
 	D3D11_MAPPED_SUBRESOURCE map_cube;
 	ZeroMemory(&map_cube, sizeof(D3D11_MAPPED_SUBRESOURCE));
 	iDeviceContext->Map(cBuff_perspective, 0, D3D11_MAP::D3D11_MAP_WRITE_DISCARD, NULL, &map_cube);
-	memcpy(map_cube.pData, &toShader_perspective, sizeof(toShader_perspective));
+	memcpy(map_cube.pData, &toshader_Default, sizeof(toshader_Default));
 	iDeviceContext->Unmap(cBuff_perspective, 0);
 	iDeviceContext->VSSetConstantBuffers(0, 1, &cBuff_perspective);
 
