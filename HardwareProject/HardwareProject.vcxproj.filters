@@ -88,6 +88,9 @@
     <FxCompile Include="PS_Normal3D.hlsl">
       <Filter>Shaders</Filter>
     </FxCompile>
+    <FxCompile Include="GS_Prototype.hlsl">
+      <Filter>Shaders</Filter>
+    </FxCompile>
   </ItemGroup>
   <ItemGroup>
     <Image Include="Assets\Test_UV_Map.dds">
