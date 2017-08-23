@@ -16,6 +16,7 @@ using namespace std;
 #include <DirectXMath.h>
 using namespace DirectX;
 #include "Assets\Test_UV_Map.h"
+#include "Assets\BasicPlatform\wall.h"
 
 #include "AlphaDefines.h"
 #include "SharedDefines.h"
@@ -26,6 +27,9 @@ using namespace DirectX;
 #include "SamplePixelShader.csh"
 #include "RTT_PixelShader.csh"
 #include "GS_Prototype.csh"
+#include "VS_Normal3D.csh"
+#include "GS_Normal3D.csh"
+#include "PS_Normal3D.csh"
 
 #include "DDSTextureLoader.h"
 
@@ -52,7 +56,10 @@ using namespace DirectX;
 
 #define PORTAL_UP_PIXELS portal_up_pixels
 
+#define WALL_PIXELS wall_pixels
+
 #pragma endregion
+
 
 enum MouseBehave{ MIA, IDLE, MOVING };
 enum MouseStatus{ LOCKED, FREE };
@@ -117,13 +124,16 @@ class DEMO_APP
 	ID3D11PixelShader *PixSha_perspective;
 	ID3D11PixelShader *PixSha_RTT;
 	ID3D11GeometryShader *GeoSha_Prototype;
-	
+	ID3D11GeometryShader *GeoSha_Normal3D;
+	ID3D11PixelShader *PixSha_Normal3D;
+	ID3D11VertexShader *vertSha_Normal3D;
 
 	// textures
 	ID3D11Texture2D *tx_UVMap;
 	ID3D11Texture2D *tx_RTT;
 	ID3D11Texture2D *tx_DepthStencil;
 	ID3D11Texture2D *tx_Skybox;
+	ID3D11Texture2D *tx_wall;
 
 	// Views
 	ID3D11RenderTargetView *iRenderTarget;
@@ -131,6 +141,7 @@ class DEMO_APP
 	ID3D11ShaderResourceView *ShaderView;
 	ID3D11ShaderResourceView *RTT_ShaderView;
 	ID3D11ShaderResourceView *SkyboxView;
+	ID3D11ShaderResourceView *Wall_ShaderView;
 	ID3D11DepthStencilView *iDepthStencilView;
 	ID3D11DepthStencilView *RTT_DepthStencilView;
 	D3D11_VIEWPORT hovCam_view;
@@ -164,11 +175,11 @@ public:
 		XMFLOAT2 POSITION;
 	};
 
-	struct VERTEX_OBJMODEL{
-		XMFLOAT3 pos;
-		XMFLOAT3 uv;
-		XMFLOAT3 norm;
-	};
+	//struct VERTEX_OBJMODEL{
+	//	XMFLOAT3 pos;
+	//	XMFLOAT3 uv;
+	//	XMFLOAT3 norm;
+	//};
 
 	
 	ID3D11Debug *Debuger;
@@ -393,6 +404,25 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 
 	iDevice->CreateTexture2D(&tx_UV_Desc, tx_UV_Data, &tx_UVMap);
 
+	D3D11_TEXTURE2D_DESC tx_Wall_Desc;
+	ZeroMemory(&tx_Wall_Desc, sizeof(D3D11_TEXTURE2D_DESC));
+	tx_Wall_Desc.Usage = D3D11_USAGE::D3D11_USAGE_IMMUTABLE;
+	tx_Wall_Desc.Format = DXGI_FORMAT::DXGI_FORMAT_B8G8R8A8_UNORM_SRGB;
+	tx_Wall_Desc.BindFlags = D3D11_BIND_FLAG::D3D11_BIND_SHADER_RESOURCE;
+	tx_Wall_Desc.ArraySize = 1;
+	tx_Wall_Desc.MipLevels = wall_numlevels;
+	tx_Wall_Desc.Height = wall_height;
+	tx_Wall_Desc.Width = wall_width;
+	tx_Wall_Desc.SampleDesc.Count = 1;
+
+	D3D11_SUBRESOURCE_DATA tx_wall_Data[wall_numlevels];
+	for (unsigned int i = 0; i < wall_numlevels; ++i){
+		ZeroMemory(&tx_wall_Data[i], sizeof(tx_wall_Data[i]));
+		tx_wall_Data[i].pSysMem = &WALL_PIXELS[wall_leveloffsets[i]];
+		tx_wall_Data[i].SysMemPitch = (wall_width >> i) * sizeof(unsigned int);
+	}
+	iDevice->CreateTexture2D(&tx_Wall_Desc, tx_wall_Data, &tx_wall);
+
 	D3D11_SHADER_RESOURCE_VIEW_DESC Shaderview_desc;
 	ZeroMemory(&Shaderview_desc, sizeof(D3D11_SHADER_RESOURCE_VIEW_DESC));
 	Shaderview_desc.Format = DXGI_FORMAT::DXGI_FORMAT_B8G8R8A8_UNORM_SRGB;
@@ -403,6 +433,17 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 	Shaderview_desc.Texture2DArray.MostDetailedMip = 0;
 
 	iDevice->CreateShaderResourceView(tx_UVMap, &Shaderview_desc, &ShaderView);
+
+	D3D11_SHADER_RESOURCE_VIEW_DESC wall_ShaderView_Desc;
+	ZeroMemory(&wall_ShaderView_Desc, sizeof(D3D11_SHADER_RESOURCE_VIEW_DESC));
+	wall_ShaderView_Desc.Format = DXGI_FORMAT::DXGI_FORMAT_B8G8R8A8_UNORM_SRGB;
+	wall_ShaderView_Desc.ViewDimension = D3D11_SRV_DIMENSION::D3D11_SRV_DIMENSION_TEXTURE2DARRAY;
+	wall_ShaderView_Desc.Texture2DArray.ArraySize = 1;
+	wall_ShaderView_Desc.Texture2DArray.FirstArraySlice = 0;
+	wall_ShaderView_Desc.Texture2DArray.MipLevels = wall_numlevels;
+	wall_ShaderView_Desc.Texture2DArray.MostDetailedMip = 0;
+
+	iDevice->CreateShaderResourceView(tx_wall, &wall_ShaderView_Desc, &Wall_ShaderView);
 
 	CreateDDSTextureFromFile(iDevice, L"Assets\\ely_darkcity\\ely_darkcity_Skybox.dds", (ID3D11Resource **)&tx_Skybox, &SkyboxView);	
 
@@ -729,88 +770,25 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 // <mah 3D />
 #pragma endregion
 
-
-#pragma region Load
-// <Prototype Loader>
-#if 0
-	std::vector<VERTEX_OBJMODEL> vObjModel;
-	LoadObjFile("Assets\\BasicPlatform\\wall.obj", vObjModel);
-
-	D3D11_BUFFER_DESC vModel_desc;
-	ZeroMemory(&vModel_desc, sizeof(D3D11_BUFFER_DESC));
-	vModel_desc.BindFlags = D3D11_BIND_FLAG::D3D11_BIND_VERTEX_BUFFER;
-	vModel_desc.Usage = D3D11_USAGE::D3D11_USAGE_IMMUTABLE;
-	vModel_desc.ByteWidth = sizeof(VERTEX_OBJMODEL)*vObjModel.size();
-
-	D3D11_SUBRESOURCE_DATA vSub_Model;
-	ZeroMemory(&vSub_Model, sizeof(D3D11_SUBRESOURCE_DATA));
-	vSub_Model.pSysMem = vObjModel.data();
-
-	iDevice->CreateBuffer(&vModel_desc, &vSub_Model, &vb_Platform);
-
-
-	std::vector<unsigned int> modelIndices;
-	unsigned int Fst, Mid, Trd;
-	for (unsigned int i = 0; i < vObjModel.size(); i += 4){
-		Fst = i;
-		Mid = i + 1;
-		Trd = i + 2;
-
-		modelIndices.push_back(Fst);
-		modelIndices.push_back(Mid);
-		modelIndices.push_back(Trd);
-
-		Fst = Trd;
-		Mid = i + 3;
-		Trd = i;
-
-		modelIndices.push_back(Fst);
-		modelIndices.push_back(Mid);
-		modelIndices.push_back(Trd);
-	}
-	ObjIndxCount = modelIndices.size();
-
-	D3D11_BUFFER_DESC iModel_desc;
-	ZeroMemory(&iModel_desc, sizeof(D3D11_BUFFER_DESC));
-	iModel_desc.Usage = D3D11_USAGE::D3D11_USAGE_DEFAULT;
-	iModel_desc.BindFlags = D3D11_BIND_FLAG::D3D11_BIND_INDEX_BUFFER;
-	iModel_desc.ByteWidth = sizeof(unsigned int) * ObjIndxCount;
-
-	ZeroMemory(&vSub_Model, sizeof(D3D11_SUBRESOURCE_DATA));
-	vSub_Model.pSysMem = modelIndices.data();
-
-	iDevice->CreateBuffer(&iModel_desc, &vSub_Model, &ib_Platform);
-
-	D3D11_INPUT_ELEMENT_DESC layout_desc[3];
-
-	layout_desc[0] = { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 };
-	layout_desc[1] = { "TEXCOORD", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 };
-	layout_desc[2] = { "NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 };
-
-	iDevice->CreateInputLayout(layout_desc, 3, &SampleVertexShader, sizeof(SampleVertexShader), &lay_OBJModel);
-
-#endif // 0
-
-	objloader.join();
-
-// <Prototype Loader/>
-#pragma endregion
-
 	iDevice->CreateGeometryShader(GS_Prototype, sizeof(GS_Prototype), NULL, &GeoSha_Prototype);
-
 
 // <lighting>
 	D3D11_BUFFER_DESC light_desc;
 	ZeroMemory(&light_desc, sizeof(D3D11_BUFFER_DESC));
 	light_desc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
 	light_desc.ByteWidth = sizeof(toShader_lighitngData);
-	light_desc.Usage = D3D11_USAGE_DEFAULT;
+	light_desc.Usage = D3D11_USAGE_DYNAMIC;
+	light_desc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
 
 	iDevice->CreateBuffer(&light_desc, NULL, &cBuff_lighting);
 
+	iDevice->CreateVertexShader(&VS_Normal3D, sizeof(VS_Normal3D), NULL, &vertSha_Normal3D);
+	iDevice->CreatePixelShader(PS_Normal3D, sizeof(PS_Normal3D), NULL, &PixSha_Normal3D);
+	iDevice->CreateGeometryShader(&GS_Normal3D, sizeof(GS_Normal3D), NULL, &GeoSha_Normal3D);
+ 
 
 // </lighting>
-
+	objloader.join();
 	turn = 12.0f;
 	timeX.Throttle(60);
 	ZeroMemory(&newCamOffset, sizeof(newCamOffset));
@@ -849,6 +827,22 @@ bool DEMO_APP::Run()
 	memcpy(map_cube.pData, &toshader_Default, sizeof(toshader_Default));
 	iDeviceContext->Unmap(cBuff_perspective, 0);
 
+// <lighting>
+	toShader_lighitngData.ambient = XMFLOAT4( 0.2f, 0.2f, 0.2f, 1.0f );
+	toShader_lighitngData.difuse = XMFLOAT4(1, 1, 1, 1.0f);
+	XMFLOAT4 tempFin(0, 0, -1, 1);
+	XMVECTOR tempVEC;
+	tempVEC = XMVector4Transform(XMLoadFloat4(&tempFin), XMLoadFloat4x4(&m_hoverCam));
+	XMStoreFloat3(&toShader_lighitngData.direction, tempVEC);
+
+
+	ZeroMemory(&map_cube, sizeof(D3D11_MAPPED_SUBRESOURCE));
+	iDeviceContext->Map(cBuff_lighting, 0, D3D11_MAP::D3D11_MAP_WRITE_DISCARD, NULL, &map_cube);
+	memcpy(map_cube.pData, &toShader_lighitngData, sizeof(toShader_lighitngData));
+	iDeviceContext->Unmap(cBuff_lighting, 0);
+
+// </lighting>
+
 	// IA Stage
 	iDeviceContext->IASetVertexBuffers(0, 1, &vb_Box, &_strides, &_offSets);
 	iDeviceContext->IASetIndexBuffer(ib_Box, DXGI_FORMAT_R32_UINT, 0);
@@ -866,6 +860,7 @@ bool DEMO_APP::Run()
 
 	// PS Stage
 	iDeviceContext->PSSetConstantBuffers(0, 1, &cBuff_perspective);
+	iDeviceContext->PSSetConstantBuffers(1, 1, &cBuff_lighting);
 	iDeviceContext->PSSetSamplers(0, 1, &SampleState);
 	iDeviceContext->PSSetShader(PixSha_perspective, NULL, NULL);
 	iDeviceContext->PSSetShaderResources(0, 1, &ShaderView);
@@ -926,6 +921,9 @@ bool DEMO_APP::Run()
 	thread step3(&DEMO_APP::RenderDefault,this, DeffContext_Model, XMFLOAT3(0, 3, 0));
 #endif
 
+
+#if 0
+
 // <RTT>
 	iDeviceContext->ClearRenderTargetView(RTT_RenderTarget, Black);
 	iDeviceContext->OMSetRenderTargets(1, &RTT_RenderTarget, NULL);
@@ -958,6 +956,9 @@ bool DEMO_APP::Run()
 
 // <RTT/>
 
+#endif
+
+
 // <Model Loader>
 	cubeWorld = XMLoadFloat4x4(&m_CubeWorld);
 	cubeWorld = XMMatrixScaling(0.25f, 0.25f, 0.25f) * cubeWorld;
@@ -969,27 +970,30 @@ bool DEMO_APP::Run()
 	iDeviceContext->Map(cBuff_perspective, 0, D3D11_MAP::D3D11_MAP_WRITE_DISCARD, NULL, &map_cube);
 	memcpy(map_cube.pData, &toshader_Default, sizeof(toshader_Default));
 	iDeviceContext->Unmap(cBuff_perspective, 0);
-	iDeviceContext->VSSetConstantBuffers(0, 1, &cBuff_perspective);
 
 	UINT strides = sizeof(VERTEX_OBJMODEL);
 	UINT offsets = 0;
 	iDeviceContext->IASetVertexBuffers(0, 1, &vb_Platform, &strides, &offsets);
 	iDeviceContext->IASetIndexBuffer(ib_Platform, DXGI_FORMAT_R32_UINT, 0);
-
 	iDeviceContext->IASetInputLayout(lay_OBJModel);
 
-// <RTT>
+	iDeviceContext->VSSetShader(vertSha_Normal3D, 0, 0);
+	iDeviceContext->VSSetConstantBuffers(0, 1, &cBuff_perspective);
+	
+	iDeviceContext->GSSetShader(GeoSha_Normal3D, 0, 0);
 	iDeviceContext->GSSetConstantBuffers(0, 1, &cBuff_perspective);
 
+	iDeviceContext->PSSetShader(PixSha_Normal3D, 0, 0);
 	iDeviceContext->PSSetConstantBuffers(0, 1, &cBuff_perspective);
-	iDeviceContext->PSSetShader(PixSha_RTT, 0, 0);
+	iDeviceContext->PSSetShaderResources(0, 1, &Wall_ShaderView);
+	iDeviceContext->PSSetShaderResources(1, 1, &Wall_ShaderView);
+
 	iDeviceContext->DrawIndexed(ObjIndxCount, 0, 0);
+
 
 // <Model loader/>
 
-	iDeviceContext->PSSetShader(PixSha_perspective,0,0);
 
-// <RTT/>
 
 #if thread_m
 	step1.join();
@@ -1070,6 +1074,12 @@ bool DEMO_APP::ShutDown()
 	GeoSha_Prototype->Release();
 	cBuff_lighting->Release();
 	cBuff_HoverCam->Release();
+
+	tx_wall->Release();
+	Wall_ShaderView->Release();
+	PixSha_Normal3D->Release();
+	vertSha_Normal3D->Release();
+	GeoSha_Normal3D->Release();
 
 	Debuger->ReportLiveDeviceObjects(D3D11_RLDO_DETAIL);
 	Debuger->Release();
@@ -1297,11 +1307,11 @@ void DEMO_APP::CreateObj(){
 
 	D3D11_INPUT_ELEMENT_DESC layout_desc[3];
 
-	layout_desc[0] = { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 };
-	layout_desc[1] = { "TEXCOORD", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 };
-	layout_desc[2] = { "NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 };
+	layout_desc[0] = { "POSITION", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 };
+	layout_desc[1] = { "TEXCOORD", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 };
+	layout_desc[2] = { "NORMAL", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 };
 
-	iDevice->CreateInputLayout(layout_desc, 3, &SampleVertexShader, sizeof(SampleVertexShader), &lay_OBJModel);
+	iDevice->CreateInputLayout(layout_desc, 3, &VS_Normal3D, sizeof(VS_Normal3D), &lay_OBJModel);
 
 	// <Prototype Loader/>
 }

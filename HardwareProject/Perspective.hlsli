@@ -19,8 +19,16 @@ struct GS_PixelShaderInput{
 	float3 uv : TEXCOORD;
 	uint outIndex : SV_ViewportArrayIndex;
 };
+
 struct LightingShaderInput{
 	float4 pos : SV_POSITION;
-	float2 uv : TEXCOORD;
+	float3 uv : TEXCOORD;
 	float3 norm : NORMAL;
+};
+
+struct GS_LightingShaderInput{
+	float4 pos : SV_POSITION;
+	float3 uv : TEXCOORD;
+	float3 norm : NORMAL;
+	uint outIndex : SV_ViewportArrayIndex;
 };

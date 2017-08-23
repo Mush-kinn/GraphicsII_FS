@@ -65,6 +65,9 @@
     <ClInclude Include="SharedDefines.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="Assets\BasicPlatform\wall.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="Trivial_VS.hlsl">
@@ -91,12 +94,18 @@
     <FxCompile Include="GS_Prototype.hlsl">
       <Filter>Shaders</Filter>
     </FxCompile>
+    <FxCompile Include="GS_Normal3D.hlsl">
+      <Filter>Shaders</Filter>
+    </FxCompile>
   </ItemGroup>
   <ItemGroup>
     <Image Include="Assets\Test_UV_Map.dds">
       <Filter>Resource Files</Filter>
     </Image>
     <Image Include="Assets\SkyboxOcean.dds">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="Assets\BasicPlatform\wall.png">
       <Filter>Resource Files</Filter>
     </Image>
   </ItemGroup>
