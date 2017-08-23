@@ -4,10 +4,9 @@
 PixelShaderInput main(VERTEX_3D input)
 {
 	PixelShaderInput output;
-	float4 pos = float4(input.pos.xyz, 1.0f);
 
 	// Transform the vertex position into projected space.
-	output.pos = MultiPerspective(pos);
+	output.pos = float4(input.pos.xyz, 1.0f);
 
 	// Pass the color through without modification.
 	if (SkyboxToggle){

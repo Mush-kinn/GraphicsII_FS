@@ -6,7 +6,7 @@ TextureCube Skybox : register(t1);
 SamplerState s : register(s0);
 
 // A pass-through function for the (interpolated) color data.
-float4 main(PixelShaderInput input) : SV_TARGET
+float4 main(GS_PixelShaderInput input) : SV_TARGET
 {
 	float4 temp;
 	if (SkyboxToggle){

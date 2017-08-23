@@ -165,6 +165,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="AlphaDefines.h" />
+    <ClInclude Include="Assets\BasicPlatform\wall.h" />
     <ClInclude Include="Assets\Portal\portal_bk.h" />
     <ClInclude Include="Assets\Portal\portal_dn.h" />
     <ClInclude Include="Assets\Portal\portal_ft.h" />
@@ -177,6 +178,16 @@
     <ClInclude Include="XTime.h" />
   </ItemGroup>
   <ItemGroup>
+    <FxCompile Include="GS_Normal3D.hlsl">
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Geometry</ShaderType>
+      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">4.0</ShaderModel>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Geometry</ShaderType>
+      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">4.0</ShaderModel>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Geometry</ShaderType>
+      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">4.0</ShaderModel>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Geometry</ShaderType>
+      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Release|x64'">4.0</ShaderModel>
+    </FxCompile>
     <FxCompile Include="GS_Prototype.hlsl">
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Geometry</ShaderType>
       <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">4.0</ShaderModel>
@@ -234,6 +245,7 @@
     <None Include="Perspective.hlsli" />
   </ItemGroup>
   <ItemGroup>
+    <Image Include="Assets\BasicPlatform\wall.png" />
     <Image Include="Assets\SkyboxOcean.dds" />
     <Image Include="Assets\Test_UV_Map.dds" />
   </ItemGroup>

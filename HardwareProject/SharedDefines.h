@@ -42,9 +42,15 @@
 // <Constant Buffers>
 CONSTANT_BUFFER_BEGIN(cbMirror_Perspective, b0)
 	matrix model;
-	matrix view;
-	matrix projection;
+	matrix view[2];
+	matrix projection[2];
 	uint SkyboxToggle;
+CONSTANT_BUFFER_END
+
+CONSTANT_BUFFER_BEGIN(cbMirror_lighting, b1)
+	float3 direction;
+	float4 ambient;
+	float4 difuse;
 CONSTANT_BUFFER_END
 
 // </Constant Buffers>
@@ -61,6 +67,13 @@ VERTEX_BUFFER_BEGIN(VERTEX_3D_NORM)
 	float2 uv SEMANTIC(TEXCOORD);
 	float3 norm SEMANTIC(NORMAL);
 VERTEX_BUFFER_END
+
+VERTEX_BUFFER_BEGIN(VERTEX_OBJMODEL)
+float3 pos SEMANTIC(POSITION);
+float3 uv SEMANTIC(TEXCOORD);
+float3 norm SEMANTIC(NORMAL);
+VERTEX_BUFFER_END
+
 // </Vertex Buffers>
 
 #endif //SHARED_DEFINES_H
