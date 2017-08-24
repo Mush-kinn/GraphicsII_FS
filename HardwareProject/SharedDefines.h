@@ -51,6 +51,7 @@ CONSTANT_BUFFER_BEGIN(cbMirror_lighting, b1)
 	float3 direction;
 	float4 ambient;
 	float4 difuse;
+	matrix boxM;
 CONSTANT_BUFFER_END
 
 // </Constant Buffers>

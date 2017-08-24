@@ -11,7 +11,7 @@ float4 main(GS_LightingShaderInput input) : SV_TARGET
 	float4 difuseL;
 
 	input.norm = normalize(input.norm);
-	difuseL.grab = skin.Sample(s, input.uv);
+	difuseL = skin.Sample(s, input.uv);
 
 	float3 finalColor;
 
