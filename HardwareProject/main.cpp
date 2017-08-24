@@ -830,10 +830,10 @@ bool DEMO_APP::Run()
 // <lighting>
 	toShader_lighitngData.ambient = XMFLOAT4( 0.2f, 0.2f, 0.2f, 1.0f );
 	toShader_lighitngData.difuse = XMFLOAT4(1, 1, 1, 1.0f);
-	XMFLOAT4 tempFin(0, 0, -1, 1);
-	XMVECTOR tempVEC;
-	tempVEC = XMVector4Transform(XMLoadFloat4(&tempFin), XMLoadFloat4x4(&m_hoverCam));
-	XMStoreFloat3(&toShader_lighitngData.direction, tempVEC);
+	XMMATRIX tempMAT;
+	tempMAT = XMMatrixInverse(NULL, XMLoadFloat4x4(&m_view));
+	XMVECTOR tempVec = tempMAT.r[2];
+	XMStoreFloat3(&toShader_lighitngData.direction, tempVec);
 
 
 	ZeroMemory(&map_cube, sizeof(D3D11_MAPPED_SUBRESOURCE));
